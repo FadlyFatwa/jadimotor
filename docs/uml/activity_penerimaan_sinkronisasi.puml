@@ -1,0 +1,85 @@
+@startuml activity_penerimaan_sinkronisasi
+title Activity Diagram - Alur Penerimaan Barang (UC-06) & Sinkronisasi Data Historis (UC-07)
+
+|User (Gudang)|
+start
+:Buka daftar Penerimaan\n(GET /receipts);
+
+|ReceiptController::index()|
+:Tampilkan PurchaseOrder\nstatus = 'open' atau 'partial_received';
+
+|User|
+:Pilih PO, klik "Terima Barang";
+
+|ReceiptController::create()|
+if (PO.status == 'completed'?) then (ya)
+  :Redirect dengan error\n"PO sudah selesai";
+  stop
+else (tidak)
+endif
+:Load PO + items.variasi;
+:Tampilkan form input qty_received;
+
+|User|
+:Isi qty diterima per item;
+:Klik "Simpan Penerimaan";
+
+|ReceiptController::store()\n[DB Transaction]|
+:Generate kode_receipt\n(RC-YYYYMMDD-XXXX);
+:Create Receipt\n(purchase_order_id, tanggal_terima, user_id);
+
+note right: Event Eloquent "created" terpicu otomatis
+
+|ReceiptObserver::created()|
+:Ambil supplier_id dari\nreceipt.purchaseOrder;
+if (supplier_id ada?) then (ya)
+  :SupplierPerformanceService\n::recalculate(supplierId);
+else (tidak)
+endif
+
+|SupplierPerformanceService\n::recalculate()|
+if (record SawNilaiHistoris\nsupplier ada?) then (tidak)
+  :Selesai, tidak ada yang dihitung;
+  stop
+else (ya)
+endif
+:Baca seed manual\n(lead_time_manual, akurasi_kuantitas_manual,\ntingkat_pemenuhan_manual, jumlah_transaksi_manual);
+
+:Hitung C3 aktual =\nAVG(DATEDIFF(receipt.tanggal_terima, po.tanggal_po))\nper PO supplier ini;
+:Hitung C4 aktual =\nAVG(LEAST(qty_received,qty_order)/qty_order*100)\ndari receipt_items;
+:Hitung C5 aktual =\nAVG(persentase item PO terpenuhi\n(qty_received >= qty_order)) per PO;
+
+:Weighted average seed manual & aktual\nwavg = (seed*Nseed + aktual*Naktual)/(Nseed+Naktual);
+
+:Update SawNilaiHistoris\n(lead_time, akurasi_kuantitas, tingkat_pemenuhan,\njumlah_transaksi, periode_akhir = today);
+note left: C2 (termin) & C6 (komunikasi)\ntidak diubah - tetap nilai manual
+
+|ReceiptController::store()\n[lanjutan transaksi]|
+:Untuk setiap item qty_received > 0:\ncreate ReceiptItem\n+ increment stock pada tabel variasis;
+
+:Cek semua PurchaseOrderItem\nSUM(qty_received) >= qty_order ?;
+if (semua item terpenuhi?) then (ya)
+  :PO.status = 'completed';
+else (tidak)
+  :PO.status = 'partial_received';
+endif
+
+:Cek semua PurchaseOrder\nmilik needlist ini status='completed'?;
+if (ya) then (ya)
+  :Needlist.status = 'completed';
+else (tidak)
+endif
+
+:Commit transaction;
+:Redirect ke receipts.index\ndengan pesan sukses;
+stop
+
+|User (Admin) - UC-07 Sinkronisasi Manual|
+:Buka halaman Data Historis SAW\n(GET /procurement/saw-historis);
+:Klik "Sync" (per supplier)\natau "Sync All";
+
+|SawHistorisController\n::syncSupplier() / syncAll()|
+:Panggil SupplierPerformanceService\n::recalculate(supplierId)\nuntuk supplier terpilih / semua supplier;
+:Redirect dengan pesan\n"Data historis berhasil disinkronkan";
+stop
+@enduml

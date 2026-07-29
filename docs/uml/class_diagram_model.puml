@@ -1,0 +1,377 @@
+@startuml class_diagram_model
+title Class Diagram - Model (Modul Procurement & SPK SAW)
+
+hide circle
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+package "Procurement Core" {
+  class Needlist {
+    +id: bigint
+    +kode_needlist: string
+    +user_id: bigint
+    +status: enum
+    +approval_status: enum
+    +approved_by: bigint
+    +approved_at: datetime
+    +approval_notes: text
+    --
+    +details()
+    +user()
+    +supplierInquiries()
+    +purchaseOrders()
+    +sawPerhitungan()
+    +sawRekomendasi()
+  }
+
+  class NeedlistItem {
+    +id: bigint
+    +needlist_id: bigint
+    +id_variasi: bigint
+    +qty: int
+    +status: enum
+    +rejected_reason: text
+    +keterangan: text
+    +is_reference: bool
+    --
+    +needlist()
+    +variasi()
+    +supplierBarang()
+    +getSupplierAttribute()
+  }
+
+  class SupplierInquiry {
+    +id: bigint
+    +needlist_id: bigint
+    +supplier_id: bigint
+    +status: enum
+    +catatan: text
+    --
+    +needlist()
+    +supplier()
+    +items()
+  }
+
+  class SupplierInquiryItem {
+    +id: bigint
+    +inquiry_id: bigint
+    +id_variasi: bigint
+    +qty: int
+    +harga_penawaran: decimal
+    +status: enum
+    +estimasi_pengiriman: date
+    --
+    +inquiry()
+    +variasi()
+  }
+
+  class PurchaseOrder {
+    +id: bigint
+    +kode_po: string
+    +needlist_id: bigint
+    +supplier_id: bigint
+    +tanggal_po: date
+    +status: enum
+    --
+    +supplier()
+    +items()
+    +needlist()
+    +receipts()
+    +receiptItems()
+  }
+
+  class PurchaseOrderItem {
+    +id: bigint
+    +purchase_order_id: bigint
+    +inquiry_id: bigint
+    +id_variasi: bigint
+    +qty_order: int
+    +harga_beli: decimal
+    +diskon: decimal
+    +qty_received: int
+    --
+    +purchaseOrder()
+    +variasi()
+    +inquiry()
+    +receiptItems()
+  }
+
+  class Receipt {
+    +id: bigint
+    +kode_receipt: string
+    +purchase_order_id: bigint
+    +tanggal_terima: date
+    +user_id: bigint
+    --
+    +items()
+    +purchaseOrder()
+    +user()
+  }
+
+  class ReceiptItem {
+    +id: bigint
+    +receipt_id: bigint
+    +purchase_order_item_id: bigint
+    +id_variasi: bigint
+    +qty_order: int
+    +qty_received: int
+    --
+    +receipt()
+    +purchaseOrderItem()
+    +variasi()
+  }
+
+  class CartNeedlist {
+    +id: bigint
+    +user_id: bigint
+    +id_variasi: bigint
+    +qty: int
+    --
+    +user()
+    +variasi()
+  }
+}
+
+package "Master Data" {
+  class Supplier {
+    +id_supplier: bigint
+    +kode_supplier: string
+    +nama_supplier: string
+    +no_telp: string
+    +alamat: string
+    --
+    +variasis()
+  }
+
+  class SupplierVariasi {
+    +id_supplier_variasi: bigint
+    +id_variasi: bigint
+    +id_supplier: bigint
+    +harga_list: int
+    +kode_list: string
+    +harga_beli: int
+    +kode_beli: string
+    +diskon: decimal
+    --
+    +variasi()
+    +supplier()
+  }
+
+  class Variasi {
+    +id_variasi: bigint
+    +barcode: string
+    +id_barang: bigint
+    +nama_variasi: string
+    +id_unit: bigint
+    +harga_jual: decimal
+    +stock: decimal
+    +status: enum
+    +part_number: string
+    +is_active: bool
+    +tier: enum
+    --
+    +m_barang()
+    +unit()
+    +suppliervariasi()
+    +carts()
+    +cartNeedlists()
+    +needlistItems()
+    +purchaseOrderItems()
+    +compatibilities()
+    +vehicleGenerations()
+    +scopeActive()
+  }
+
+  class MBarang {
+    +id_barang: bigint
+    +kode_barang: string
+    +nama_barang: string
+    +id_kategori: bigint
+    +description: text
+    +is_active: bool
+    --
+    +variasi()
+    +kategori()
+    +scopeActive()
+  }
+
+  class Kategori {
+    +id_kategori: bigint
+    +kode_kategori: string
+    +nama_kategori: string
+    +slug: string
+    +description: text
+    --
+    +m_barangs()
+  }
+
+  class User {
+    +id: bigint
+    +name: string
+    +username: string
+    +email: string
+    +role: enum
+  }
+}
+
+package "SAW (DSS Pemilihan Supplier)" {
+  class SawKriteria {
+    +id: bigint
+    +kode: string
+    +nama: string
+    +jenis: enum(cost|benefit)
+    +bobot: decimal(5,4)
+    +satuan: string
+    +is_active: bool
+    +urutan: int
+    --
+    +scopeAktif()
+    +isCost(): bool
+    +isBenefit(): bool
+  }
+
+  class SawNilaiHistoris {
+    +id: bigint
+    +supplier_id: bigint
+    +periode_mulai: date
+    +periode_akhir: date
+    +termin_pembayaran: decimal
+    +lead_time: decimal
+    +lead_time_manual: decimal
+    +akurasi_kuantitas: decimal
+    +akurasi_kuantitas_manual: decimal
+    +tingkat_pemenuhan: decimal
+    +tingkat_pemenuhan_manual: decimal
+    +komunikasi: decimal
+    +jumlah_transaksi: int
+    +jumlah_transaksi_manual: int
+    +catatan: text
+    --
+    +supplier()
+  }
+
+  class SawPerhitungan {
+    +id: bigint
+    +needlist_id: bigint
+    +id_variasi: bigint <<nullable>>
+    +id_barang: bigint <<nullable>>
+    +tier_key: char(32) <<nullable>>
+    +bobot_snapshot: json
+    +status: enum(draft|final)
+    +calculated_at: datetime
+    +calculated_by: bigint
+    --
+    +needlist()
+    +variasi()
+    +mBarang()
+    +details()
+    +calculatedBy()
+    +rekomendasi()
+  }
+
+  class SawPerhitunganDetail {
+    +id: bigint
+    +perhitungan_id: bigint
+    +supplier_id: bigint
+    +id_variasi: bigint
+    +nilai_c1: decimal
+    +nilai_c2: decimal
+    +nilai_c3: decimal
+    +nilai_c4: decimal
+    +nilai_c5: decimal
+    +nilai_c6: decimal
+    +norm_c1..norm_c6: decimal
+    +weighted_c1..weighted_c6: decimal
+    +nilai_vi: decimal
+    +ranking: int
+    +is_recommended: bool
+    +sumber_c1: enum
+    +sumber_c3: enum
+    --
+    +perhitungan()
+    +supplier()
+    +variasi()
+  }
+
+  class SawRekomendasi {
+    +id: bigint
+    +needlist_id: bigint
+    +id_variasi: bigint
+    +perhitungan_id: bigint
+    +supplier_id_saw: bigint
+    +supplier_id_dipilih: bigint <<nullable>>
+    +mengikuti_rekomendasi: bool
+    +alasan_override: text
+    +nilai_vi_terpilih: decimal
+    +confirmed_at: datetime
+    +confirmed_by: bigint
+    --
+    +needlist()
+    +variasi()
+    +perhitungan()
+    +supplierSaw()
+    +supplierDipilih()
+    +confirmedBy()
+  }
+}
+
+' ===================== RELATIONS =====================
+
+Needlist "1" *-- "0..*" NeedlistItem : details
+Needlist "1" o-- "0..*" SupplierInquiry : supplierInquiries
+Needlist "1" o-- "0..*" PurchaseOrder : purchaseOrders
+Needlist "1" o-- "0..*" SawPerhitungan : sawPerhitungan
+Needlist "1" o-- "0..*" SawRekomendasi : sawRekomendasi
+Needlist "0..*" --> "1" User : user
+
+NeedlistItem "0..*" --> "1" Variasi : variasi
+NeedlistItem "0..1" --> "1" SupplierVariasi : supplierBarang
+
+SupplierInquiry "0..*" --> "1" Supplier : supplier
+SupplierInquiry "1" *-- "0..*" SupplierInquiryItem : items
+
+SupplierInquiryItem "0..*" --> "1" Variasi : variasi
+
+PurchaseOrder "0..*" --> "1" Supplier : supplier
+PurchaseOrder "1" *-- "0..*" PurchaseOrderItem : items
+PurchaseOrder "1" o-- "0..*" Receipt : receipts
+
+PurchaseOrderItem "0..*" --> "1" Variasi : variasi
+PurchaseOrderItem "0..*" --> "1" SupplierInquiry : inquiry
+PurchaseOrderItem "1" o-- "0..*" ReceiptItem : receiptItems
+
+Receipt "1" *-- "0..*" ReceiptItem : items
+Receipt "0..*" --> "1" User : user
+
+ReceiptItem "0..*" --> "1" Variasi : variasi
+ReceiptItem "0..*" --> "1" PurchaseOrderItem : purchaseOrderItem
+
+CartNeedlist "0..*" --> "1" User : user
+CartNeedlist "0..*" --> "1" Variasi : variasi
+
+SupplierVariasi "0..*" --> "1" Variasi : variasi
+SupplierVariasi "0..*" --> "1" Supplier : supplier
+
+Variasi "0..*" --> "1" MBarang : m_barang
+MBarang "0..*" --> "1" Kategori : kategori
+
+SawNilaiHistoris "0..*" --> "1" Supplier : supplier
+
+SawPerhitungan "0..*" --> "1" Needlist : needlist
+SawPerhitungan "0..*" --> "0..1" Variasi : variasi
+SawPerhitungan "0..*" --> "0..1" MBarang : mBarang
+SawPerhitungan "1" *-- "0..*" SawPerhitunganDetail : details
+SawPerhitungan "0..*" --> "1" User : calculatedBy
+SawPerhitungan "1" o-- "0..1" SawRekomendasi : rekomendasi
+
+SawPerhitunganDetail "0..*" --> "1" Supplier : supplier
+SawPerhitunganDetail "0..*" --> "0..1" Variasi : variasi
+
+SawRekomendasi "0..*" --> "1" Needlist : needlist
+SawRekomendasi "0..*" --> "1" Variasi : variasi
+SawRekomendasi "0..*" --> "1" SawPerhitungan : perhitungan
+SawRekomendasi "0..*" --> "1" Supplier : supplierSaw
+SawRekomendasi "0..*" --> "0..1" Supplier : supplierDipilih
+SawRekomendasi "0..*" --> "0..1" User : confirmedBy
+
+@enduml

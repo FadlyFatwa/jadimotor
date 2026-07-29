@@ -1,0 +1,30 @@
+@startuml activity_pemilihan_supplier
+title Activity Diagram - Alur Pemilihan Supplier (UC-02 s.d. UC-05, overview)
+
+|User|
+start
+:Buka halaman Detail Needlist\n(GET /needlist/{id}/show);
+
+|System\n(NeedlistController::show)|
+:Eager-load needlist beserta\ndetails, supplierInquiries.items,\npurchaseOrders, sawRekomendasi;
+:Ambil referenceVariasiIds\n(item is_reference = true);
+:Group semua SupplierInquiryItem\nberdasarkan id_barang (Master Barang)\n=> groupedItems;
+:Ambil SawRekomendasi tersimpan\n(keyBy id_variasi);
+:Render view needlist/show.blade\n(tab "Pemilihan Supplier");
+
+|View (Blade/JS)|
+:Sub-grouping per tier\n(OEM/Original/Aftermarket/KW)\n& kompatibilitas kendaraan;
+:Tampilkan tabel penawaran\nharga per supplier per kluster;
+
+|User|
+if (Hitung rekomendasi SAW?) then (ya)
+  :Klik tombol "Hitung SAW"\npada kluster tertentu;
+  note right: lanjut ke diagram\nActivity Rekomendasi SAW (UC-03)
+else (tidak)
+endif
+
+:Centang supplier pilihan\nuntuk setiap variasi;
+:Klik tombol "Simpan Pilihan";
+note right: lanjut ke diagram\nActivity Konfirmasi Supplier (UC-05)
+stop
+@enduml

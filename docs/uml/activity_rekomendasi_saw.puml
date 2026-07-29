@@ -1,0 +1,78 @@
+@startuml activity_rekomendasi_saw
+title Activity Diagram - Alur Rekomendasi SAW (UC-03)
+
+|User|
+start
+:Klik tombol "Hitung SAW"\npada kluster (master+kendaraan+tier);
+
+|Browser (AJAX)|
+:POST /procurement/supplier-selection/hitung-saw\n(needlist_id, master_barang_id, variasi_ids);
+
+|SupplierSelectionSawController\n::hitungSAW()|
+:Validasi request\n(needlist_id, master_barang_id, variasi_ids);
+
+:getInquiryDataByCluster(needlistId, variasiIds);
+note right
+  - Ambil SupplierInquiry status='responded'
+  - Ambil item dgn id_variasi in variasiIds,
+    harga_penawaran & estimasi_pengiriman terisi
+  - 1 kombinasi (variasi, supplier) = 1 kandidat
+  - Hitung C1 (harga) & C3 (lead time = selisih hari)
+  - Dedup per kandidat (ambil C1 terendah)
+end note
+
+if (Jumlah kandidat >= 2?) then (tidak)
+  :Response 422\n"Minimal 2 kombinasi variasi+supplier";
+  stop
+else (ya)
+endif
+
+:mergeWithHistoris(inquiryData);
+note right
+  Untuk setiap kandidat, ambil
+  SawNilaiHistoris terbaru per supplier_id:
+  - C2 = termin_pembayaran
+  - C3 = lead_time historis (override jika > 0)
+  - C4 = akurasi_kuantitas
+  - C5 = tingkat_pemenuhan
+  - C6 = komunikasi
+  Jika tidak ada historis -> default 0
+end note
+
+:Hitung tierKey = md5(sort(variasiIds));
+:Tentukan idVariasiForRecord\n(diisi jika hanya 1 variasi, else null);
+
+|SawService::calculate()|
+:Ambil kriteria aktif\n(SawKriteria::aktif());
+
+if (Total bobot kriteria == 1.0?) then (tidak)
+  :throw RuntimeException;
+  |SupplierSelectionSawController|
+  :Response 500 (error bobot kriteria);
+  stop
+else (ya)
+endif
+
+:buildMatrix()\n=> matriks Xij per kandidat x kriteria;
+:normalize()\n=> Rij\n(BENEFIT: x/max, COST: min/x);
+:weightedSum()\n=> Vi = Sigma(Wj x Rij);
+:rank()\n=> urutkan desc berdasar Vi,\nset ranking & is_recommended;
+
+:saveToDatabase() [DB Transaction];
+note right
+  - Upsert berdasar (needlist_id, id_barang, tier_key):
+    hapus SawPerhitungan & detail lama jika ada
+  - Create SawPerhitungan baru
+    (snapshot bobot, status='draft', calculated_by)
+  - Create SawPerhitunganDetail per kandidat
+    (nilai_c1..c6, norm_c1..c6, weighted_c1..c6,
+     nilai_vi, ranking, is_recommended, sumber_c1/c3)
+end note
+
+|SupplierSelectionSawController|
+:Response JSON success\n(matrix, normalized, ranked, rekomendasi);
+
+|View (Blade/JS)|
+:Render panel hasil SAW\n(matriks keputusan, normalisasi,\nranking & rekomendasi terbaik);
+stop
+@enduml

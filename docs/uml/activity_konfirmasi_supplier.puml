@@ -1,0 +1,98 @@
+@startuml activity_konfirmasi_supplier
+title Activity Diagram - Alur Konfirmasi Supplier (UC-05)
+
+|User|
+start
+:Lihat hasil rekomendasi SAW\nuntuk satu variasi;
+
+if (Setuju dengan rekomendasi SAW?) then (ya)
+  :Klik "Terapkan Rekomendasi";
+else (tidak)
+  :Pilih supplier lain secara manual;
+  :Isi alasan override;
+endif
+
+|Browser (AJAX)|
+:POST /procurement/supplier-selection/konfirmasi\n(needlist_id, id_variasi, perhitungan_id,\nsupplier_id_saw, supplier_id_dipilih, alasan_override);
+
+|SupplierSelectionSawController\n::konfirmasiPilihan()|
+:Validasi request;
+:mengikuti = (supplier_id_saw == supplier_id_dipilih);
+
+if (mengikuti == false\nDAN alasan_override kosong?) then (ya)
+  :Response 422\n"Alasan wajib diisi";
+  stop
+else (tidak)
+endif
+
+:Ambil nilai_vi dari saw_perhitungan_detail\n(perhitungan_id, supplier_id_dipilih, id_variasi);
+
+:SawRekomendasi::updateOrCreate\n(unique key: needlist_id + id_variasi);
+note right
+  Simpan: perhitungan_id, supplier_id_saw,
+  supplier_id_dipilih, mengikuti_rekomendasi,
+  alasan_override (null jika mengikuti),
+  nilai_vi_terpilih, confirmed_at, confirmed_by
+end note
+
+:Response JSON success;
+
+|User|
+:Ulangi untuk setiap variasi\ndalam needlist;
+:Centang item SupplierInquiryItem\nsesuai pilihan final;
+:Klik "Simpan Pilihan";
+
+|Browser|
+:POST /needlist/{needlist}/save/selection;
+
+|SupplierSelectionController\n::saveSelection()|
+if (needlist.status == 'po_issued'?) then (ya)
+  :abort 403\n"Selection tidak dapat diubah";
+  stop
+else (tidak)
+endif
+
+:Ambil semua SupplierInquiryItem\nmilik needlist ini;
+:Reset semua item -> status='pending';
+:Set item yang dicentang -> status='selected';
+
+:variasiDenganPenawaran =\nitem dgn harga_penawaran NOT NULL\n(distinct id_variasi);
+:variasiTerpilih =\nitem status='selected'\n(distinct id_variasi);
+:variasiKosong = variasiDenganPenawaran - variasiTerpilih;
+
+if (variasiKosong tidak kosong?) then (ya)
+  :Rollback semua item -> 'pending';
+  :Response error\n"Pilihan belum lengkap";
+  stop
+else (tidak)
+endif
+
+:Update needlist.status = 'selection_in_progress';
+:Redirect ke needlist.show #pane-selection;
+
+|User|
+:Klik "Buat Surat Pesanan (PO)";
+
+|Browser|
+:POST /needlist/{needlist}/create/po;
+
+|PurchaseOrderController\n::createFromNeedlist()|
+if (needlist.status == 'po_issued'\natau PO sudah ada?) then (ya)
+  :Redirect dengan error;
+  stop
+else (tidak)
+endif
+
+:Ambil SupplierInquiryItem\nstatus='selected';
+if (item kosong\natau penawaran belum lengkap?) then (ya)
+  :Redirect dengan error;
+  stop
+else (tidak)
+endif
+
+:Group item terpilih by supplier_id;
+:[DB Transaction]\nUntuk setiap supplier, buat:\n- PurchaseOrder (kode PO-YYYYMMDD-XXXX)\n- PurchaseOrderItem (qty_order, harga_beli);
+:Update needlist.status = 'po_issued';
+:Redirect ke needlist.show\n(tab Surat Pesanan aktif);
+stop
+@enduml

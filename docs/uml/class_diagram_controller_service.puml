@@ -1,0 +1,145 @@
+@startuml class_diagram_controller_service
+title Class Diagram - Controller, Service & Observer (Modul SPK SAW)
+
+hide circle
+skinparam classAttributeIconSize 0
+
+package "App\\Http\\Controllers\\Procurement" {
+
+  class SupplierSelectionController {
+    +saveSelection(Request, needlist_id)
+  }
+
+  class SupplierSelectionSawController {
+    -sawService: SawService
+    +__construct(SawService)
+    +hitungSAW(Request): JsonResponse
+    +konfirmasiPilihan(Request): JsonResponse
+    +detailSaw(id): JsonResponse
+    +laporan(Request): View
+    -getInquiryDataByCluster(needlistId, variasiIds): array
+    -mergeWithHistoris(inquiryData): array
+  }
+
+  class SawHistorisController {
+    +index(Request): View
+    +create(): View
+    +store(Request)
+    +edit(SawNilaiHistoris): View
+    +update(Request, SawNilaiHistoris)
+    +destroy(SawNilaiHistoris)
+    +syncSupplier(supplierId, SupplierPerformanceService)
+    +syncAll(SupplierPerformanceService)
+  }
+
+  class NeedlistController {
+    +index(): View
+    +indexJson(): DataTables
+    +submitted(): View
+    +show(id): View
+    +supervisorIndex(): View
+    +supervisorJson(): DataTables
+    +loadReview(id): View
+    +submitReview(id)
+    +approveTemp(id, Request)
+    +rejectTemp(id, Request)
+    +edit(id): View
+    +update(Request, id)
+    +storeFromCart()
+    +submit(id)
+    +detailJson(id): JsonResponse
+    +toggleReference(itemId): JsonResponse
+    +getDraftItemsJson(id): JsonResponse
+    +addDraftDetail(Request, id): JsonResponse
+    +removeDraftDetail(Request, id): JsonResponse
+    +storeDetail(Request): JsonResponse
+    +destroyDetail(Request)
+  }
+
+  class SupplierInquiryController {
+    +storeAllFromNeedlist(Request, needlist_id)
+    +generatePdf(id)
+    +storeResponse(Request, id)
+    +fillModal(id): View
+    +previewModal(id): View
+  }
+
+  class PurchaseOrderController {
+    +show(id): View
+    +print(id)
+    +createFromNeedlist(Request, needlist_id)
+  }
+
+  class ReceiptController {
+    +index(): View
+    +create(PurchaseOrder): View
+    +store(Request, PurchaseOrder)
+  }
+}
+
+package "App\\Services" {
+  class SawService {
+    +calculate(needlistId: int, idVariasi: ?int, supplierData: array, idBarang: ?int, tierKey: ?string): array
+    -candidateKey(s: array): string
+    -buildMatrix(supplierData: array, kriterias: Collection): array
+    -normalize(matrix: array, kriterias: Collection): array
+    -weightedSum(normalized: array, kriterias: Collection, supplierData: array): Collection
+    -rank(viScores: Collection): Collection
+    -saveToDatabase(...): SawPerhitungan
+    -validateBobot(kriterias: Collection): void
+  }
+
+  class SupplierPerformanceService {
+    +recalculate(supplierId: int): void
+  }
+}
+
+package "App\\Observers" {
+  class ReceiptObserver {
+    +created(receipt: Receipt): void
+  }
+}
+
+package "App\\Models (ringkas)" {
+  class Needlist
+  class SupplierInquiryItem
+  class PurchaseOrder
+  class Receipt
+  class SawKriteria
+  class SawPerhitungan
+  class SawPerhitunganDetail
+  class SawRekomendasi
+  class SawNilaiHistoris
+}
+
+' ===================== DEPENDENCIES =====================
+
+SupplierSelectionSawController ..> SawService : uses
+SupplierSelectionSawController ..> SawNilaiHistoris : reads (mergeWithHistoris)
+SupplierSelectionSawController ..> SupplierInquiryItem : reads (getInquiryDataByCluster)
+SupplierSelectionSawController ..> SawPerhitungan : reads/writes (detailSaw, laporan)
+SupplierSelectionSawController ..> SawRekomendasi : writes (konfirmasiPilihan)
+
+SawService ..> SawKriteria : reads (aktif)
+SawService ..> SawPerhitungan : creates/upserts
+SawService ..> SawPerhitunganDetail : creates
+
+SawHistorisController ..> SupplierPerformanceService : uses
+SawHistorisController ..> SawNilaiHistoris : CRUD
+
+SupplierSelectionController ..> SupplierInquiryItem : updates status
+SupplierSelectionController ..> Needlist : updates status
+
+PurchaseOrderController ..> SupplierInquiryItem : reads (status=selected)
+PurchaseOrderController ..> PurchaseOrder : creates
+PurchaseOrderController ..> Needlist : updates status
+
+ReceiptController ..> Receipt : creates
+ReceiptController ..> PurchaseOrder : updates status
+ReceiptController ..> Needlist : updates status
+
+Receipt ..> ReceiptObserver : <<Eloquent event: created>>
+ReceiptObserver ..> SupplierPerformanceService : uses
+SupplierPerformanceService ..> SawNilaiHistoris : updates (C3, C4, C5)
+
+@enduml
