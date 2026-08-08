@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class PurchaseOrder extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'kode_po', 'needlist_id', 'supplier_id', 'tanggal_po', 'status',
         'closed_at', 'is_force_closed', 'catatan_tutup',

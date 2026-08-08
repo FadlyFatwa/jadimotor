@@ -1,129 +1,6 @@
 @section('scripts')
 <script>
     $(document).ready(function () {
-        // =========================================================================
-        // Rekomendasi Semua — hitung SAW untuk semua kelompok (>=2 supplier) sekaligus
-        // =========================================================================
-
-        $(document).on("click", "#btnRekomendasiSemua", function () {
-            var $btn = $(this);
-            var needlistId = $btn.data("needlist-id");
-            var $icon = $btn.find("i").first();
-            var $label = $btn.find(".btn-label");
-            var nextLabel = $label.text();
-
-            $btn.prop("disabled", true);
-            $icon.removeClass("fa-calculator").addClass("fa-spinner fa-spin");
-            $label.text("Menghitung...");
-
-            $.ajax({
-                url:
-                    '{{ url("/procurement/pemilihan-supplier") }}/' +
-                    needlistId +
-                    "/rekomendasi-semua",
-                method: "POST",
-                data: { _token: "{{ csrf_token() }}" },
-                success: function (res) {
-                    if (!res.success) {
-                        Swal.fire({
-                            icon: "warning",
-                            title: "Tidak Ada yang Dihitung",
-                            text: res.message,
-                            confirmButtonColor: "#3085d6",
-                        });
-                        return;
-                    }
-                    res.data.forEach(function (group) {
-                        applyRekomendasi(group.panel_key, group.recommended);
-                    });
-                    toastr.success(
-                        "Rekomendasi berhasil dihitung ulang untuk " +
-                            res.data.length +
-                            " kelompok.",
-                    );
-                },
-                error: function (xhr) {
-                    var msg = xhr.responseJSON
-                        ? xhr.responseJSON.message
-                        : "Terjadi kesalahan server.";
-                    Swal.fire({
-                        icon: "error",
-                        title: "Gagal",
-                        text: msg,
-                        confirmButtonColor: "#3085d6",
-                    });
-                },
-                complete: function () {
-                    $btn.prop("disabled", false);
-                    $icon
-                        .removeClass("fa-spinner fa-spin")
-                        .addClass("fa-calculator");
-                    $label.text(nextLabel);
-                },
-            });
-        });
-
-        function applyRekomendasi(panelKey, rec) {
-            var $rows = $(
-                'tr.saw-supplier-row[data-panel-key="' + panelKey + '"]',
-            );
-
-            $rows.each(function () {
-                var $row = $(this);
-                var isWinner =
-                    String($row.data("supplier-id")) ===
-                        String(rec.supplier_id) &&
-                    String($row.data("variasi-id")) === String(rec.id_variasi);
-
-                // Aktifkan tombol Pilih di seluruh kelompok ini — gating terbuka setelah dihitung.
-                $row.find(".btn-pilih-supplier")
-                    .prop("disabled", false)
-                    .removeAttr("title");
-
-                $row.find(".badge-rekomendasi").remove();
-                if (isWinner) {
-                    var badgeHtml =
-                        rec.sumber === "auto_exclude"
-                            ? '<span class="badge badge-info ml-1 badge-rekomendasi" style="font-size:.65rem;" title="Alternatif lain pada kelompok ini belum memiliki data kinerja (historis), jadi supplier ini ditetapkan langsung tanpa perhitungan SAW."><i class="fas fa-check-circle mr-1"></i>Ditetapkan Otomatis</span>'
-                            : '<span class="badge badge-warning ml-1 badge-rekomendasi" style="font-size:.65rem;">Direkomendasikan</span>';
-                    $row.find(".cell-supplier-name").append(badgeHtml);
-                    $row.find(".cell-estimasi-tiba").text(rec.estimasi_tiba);
-                }
-
-                // Auto-pilih baris pemenang, lepas semua baris lain di KELOMPOK ini
-                // (bukan cuma variasi yang sama) — variasi/merk lain dalam satu grade
-                // group adalah alternatif yang saling bersaing untuk kebutuhan yang sama.
-                setPilihState($row, isWinner);
-            });
-
-            var $line = $(
-                '.saw-result-line[data-panel-key="' + panelKey + '"]',
-            );
-            if ($line.length) {
-                var label =
-                    rec.sumber === "auto_exclude"
-                        ? "Ditetapkan otomatis: "
-                        : "Direkomendasikan: ";
-                var tail =
-                    rec.sumber === "auto_exclude"
-                        ? ' <span class="text-muted">(alternatif lain belum memiliki data kinerja)</span>'
-                        : " &middot; estimasi tiba " +
-                          Math.round(parseFloat(rec.lead_time_hari)) +
-                          " hari";
-                $line.html(
-                    label +
-                        "<strong>" +
-                        rec.nama +
-                        "</strong>" +
-                        " &mdash; Rp " +
-                        Math.round(parseFloat(rec.harga)).toLocaleString(
-                            "id-ID",
-                        ) +
-                        tail,
-                );
-            }
-        }
-
         function setPilihState($row, selected) {
             var itemId = $row.data("item-id");
             var $btn = $row.find(".btn-pilih-supplier");
@@ -210,7 +87,31 @@
 
         $("#btnSimpanPilihan").on("click", function () {
             var formAction = $(this).data("formaction");
+            var sudahDipilihLengkap = $(this).data("sudah-dipilih-lengkap") == 1;
 
+            if (sudahDipilihLengkap) {
+                Swal.fire({
+                    icon: "warning",
+                    title: "Sudah Pernah Dipilih Lengkap",
+                    html:
+                        "Needlist ini sebelumnya sudah punya pilihan supplier untuk semua kelompok.<br>" +
+                        '<small class="text-muted">Kalau lanjut, pilihan lama akan ditimpa dengan yang baru.</small>',
+                    showCancelButton: true,
+                    confirmButtonText: "Ya, Lanjutkan Ubah",
+                    cancelButtonText: "Batal",
+                    confirmButtonColor: "#dc3545",
+                    cancelButtonColor: "#adb5bd",
+                    reverseButtons: true,
+                }).then(function (result) {
+                    if (result.isConfirmed) validateAndConfirmSimpanPilihan(formAction);
+                });
+                return;
+            }
+
+            validateAndConfirmSimpanPilihan(formAction);
+        });
+
+        function validateAndConfirmSimpanPilihan(formAction) {
             var selectablePanelKeys = [];
             $("input.saw-checkbox:not([disabled])").each(function () {
                 var pk = String($(this).data("panel-key"));
@@ -275,7 +176,7 @@
                 if (!result.isConfirmed) return;
                 $("#formPemilihan").attr("action", formAction).submit();
             });
-        });
+        }
     });
 
     // =========================================================================

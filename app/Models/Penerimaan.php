@@ -13,12 +13,14 @@ class Penerimaan extends Model
     // Nama tabel
     protected $table = 'penerimaans';
 
-    // Primary key kustom
-    protected $primaryKey = 'ID_Penerimaan';
+    // Primary key kustom (matches the actual `id_penerimaan` column from the
+    // create_penerimaans_table migration — was previously "ID_Penerimaan",
+    // which never matched a real column).
+    protected $primaryKey = 'id_penerimaan';
 
     // Kolom yang dapat diisi secara massal
     protected $fillable = [
-        'id_unit',
+        'id_supplier',
         'Invoice',
         'Tanggal_Nota',
         'Tanggal_Datang',
@@ -32,22 +34,13 @@ class Penerimaan extends Model
     // Relasi ke tabel suppliers
     public function supplier()
     {
-        return $this->belongsTo(Supplier::class, 'id_unit', 'id_unit');
+        return $this->belongsTo(Supplier::class, 'id_supplier', 'id_supplier');
     }
 
     // Relasi ke tabel detail_penerimaans
     public function details()
     {
-        return $this->hasMany(DetailPenerimaan::class, 'ID_Penerimaan', 'ID_Penerimaan');
-    }
-    public function kategori()
-    {
-        return $this->belongsTo(Kategori::class, 'id_kategori');
-    }
-
-    public function unit()
-    {
-        return $this->belongsTo(Unit::class, 'id_unit');
+        return $this->hasMany(DetailPenerimaan::class, 'id_penerimaan', 'id_penerimaan');
     }
 
 }

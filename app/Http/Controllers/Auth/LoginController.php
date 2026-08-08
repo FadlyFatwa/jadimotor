@@ -51,8 +51,12 @@ class LoginController extends Controller
                 return '/kategori';
             case 'kasir':
                 return '/unit';
+            case 'procurement':
+                return '/procurement/pemilihan-supplier';
+            case 'supervisor':
+                return '/procurement/saw-kriteria';
             default:
-                return '/home';
+                return '/dashboard';
         }
     }
 }

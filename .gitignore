@@ -7,9 +7,14 @@
 /storage/pail
 /vendor
 .env
+.env copy
 .env.backup
 .env.production
 .phpactor.json
+/public/reports
+/docs/*.csv
+/docs/*.html
+/docs/*.sql
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml

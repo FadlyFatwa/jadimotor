@@ -1,5 +1,5 @@
 @extends('layouts.main')
-@section('title', 'Kriteria & Bobot SAW')
+@section('title', 'Kriteria & Bobot Pemilihan Supplier')
 
 @php
     // Kriteria & Bobot hanya boleh diubah oleh Manager Toko (supervisor) atau admin/owner.
@@ -12,7 +12,7 @@
     <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
             <h2 class="font-weight-bold mb-1" style="font-size:1.5rem">
-                <i class="fas fa-sliders-h mr-2 text-primary" style="font-size:1.3rem"></i>Kriteria & Bobot SAW
+                <i class="fas fa-sliders-h mr-2 text-primary" style="font-size:1.3rem"></i>Kriteria & Bobot Pemilihan Supplier
             </h2>
             <p class="text-muted mb-0" style="font-size:.875rem">
                 Konfigurasi kriteria penilaian supplier dan bobot tiap kriteria
@@ -57,15 +57,6 @@
                 Siap dipakai untuk perhitungan SAW.
             @endif
         </div>
-        @if($canManageKriteria && !$isBalanced && $totalBobotAktif > 0)
-            <form method="POST" action="{{ route('saw.kriteria.normalize') }}"
-                  data-confirm="Normalisasi otomatis akan menyesuaikan proporsi bobot semua kriteria aktif supaya totalnya tepat 100%. Lanjutkan?">
-                @csrf
-                <button type="submit" class="btn btn-sm btn-outline-dark">
-                    <i class="fas fa-magic mr-1"></i>Normalisasi Otomatis
-                </button>
-            </form>
-        @endif
     </div>
 
     <div class="card shadow-sm">

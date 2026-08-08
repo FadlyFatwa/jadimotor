@@ -9,7 +9,7 @@ $menus = [
         "title"   => "Dashboard",
         "path"    => "/dashboard",
         "icon"    => "nav-icon fas fa-home",
-        "roles"   => ['owner','admin','gudang','kasir','supervisor','procurement'],
+        "roles"   => ['owner','admin','gudang','kasir'],
         "submenu" => []
     ],
 
@@ -39,10 +39,10 @@ $menus = [
         "icon"    => "nav-icon fas fa-shopping-bag",
         "roles"   => ['owner','admin','supervisor','procurement'],
         "submenu" => [
-            (object)["title" => "Daftar Kebutuhan",   "path" => "/needlist",                               "icon" => "nav-icon fas fa-clipboard-list"],
-            (object)["title" => "Persetujuan",         "path" => "/needlist/supervisor",                    "icon" => "nav-icon fas fa-user-check", "roles" => ['owner','admin','supervisor']],
+            (object)["title" => "Daftar Kebutuhan",   "path" => "/needlist",                               "icon" => "nav-icon fas fa-clipboard-list", "roles" => ['owner','admin']],
+            (object)["title" => "Persetujuan",         "path" => "/needlist/supervisor",                    "icon" => "nav-icon fas fa-user-check", "roles" => ['owner','admin']],
             (object)["title" => "Pemilihan Supplier", "path" => "#", "icon" => "nav-icon fas fa-handshake", "submenu" => [
-                (object)["title" => "Daftar Pemilihan",    "path" => "/procurement/pemilihan-supplier", "icon" => "nav-icon fas fa-list-ul"],
+                (object)["title" => "Daftar Pemilihan",    "path" => "/procurement/pemilihan-supplier", "icon" => "nav-icon fas fa-list-ul", "roles" => ['owner','admin','procurement']],
                 (object)["title" => "Kriteria & Bobot",  "path" => "/procurement/saw-kriteria",  "icon" => "nav-icon fas fa-sliders-h"],
                 (object)["title" => "Kinerja Supplier", "path" => "/procurement/saw-historis",  "icon" => "nav-icon fas fa-history"],
             ]],
@@ -54,7 +54,7 @@ $menus = [
         "title"   => "Laporan ",
         "path"    => "/procurement/supplier-selection/laporan",
         "icon"    => "nav-icon fas fa-chart-bar",
-        "roles"   => ['owner','admin','supervisor','procurement'],
+        "roles"   => ['owner','admin'],
         "submenu" => []
     ],
 
@@ -63,7 +63,7 @@ $menus = [
         "header"  => "OPERASIONAL",
         "title"   => "Gudang",
         "icon"    => "nav-icon fas fa-warehouse",
-        "roles"   => ['supervisor','admin','gudang'],
+        "roles"   => ['admin','gudang'],
         "submenu" => [
             (object)["title" => "Penerimaan Barang", "path" => "/receipts",           "icon" => "nav-icon fas fa-dolly"],
             (object)["title" => "Detail Penerimaan", "path" => "/detail-penerimaan",  "icon" => "nav-icon fas fa-list-alt"],

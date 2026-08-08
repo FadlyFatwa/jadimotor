@@ -17,8 +17,6 @@
         $isPreInquiry = in_array($needlist->status, ['draft', 'submitted', 'approved', 'rejected']);
 
         $groupsCollection = collect($groups);
-        $groupsNeedingSaw = $groupsCollection->where('unique_supplier_count', '>=', 2);
-
         $byMasterBarang = $groupsCollection->groupBy('master_barang_id');
 
         $tierColorMap  = ['OEM' => 'primary', 'Original' => 'success', 'Aftermarket' => 'warning', 'KW' => 'secondary'];
@@ -38,16 +36,6 @@
                     </div>
                 </div>
                 <div class="flex-shrink-0 text-nowrap">
-                    @if(!$isPoIssued && !$isPreInquiry && $groupsNeedingSaw->isNotEmpty())
-                        <button type="button" id="btnRekomendasiSemua" class="btn btn-sm btn-outline-info"
-                                data-needlist-id="{{ $needlist->id }}" title="Hitung ulang rekomendasi memakai data konfirmasi harga terbaru">
-                            <i class="fas fa-calculator mr-1"></i>
-                            <span class="btn-label">Hitung Ulang Rekomendasi</span>
-                        </button>
-                    @endif
-                    <a href="{{ route('needlist.show', $needlist->id) }}" class="btn btn-sm btn-outline-secondary">
-                        <i class="fas fa-clipboard-list mr-1"></i> Detail Needlist
-                    </a>
                     <a href="{{ route('pemilihan-supplier.ringkasan', $needlist->id) }}" class="btn btn-sm btn-outline-secondary">
                         <i class="fas fa-arrow-left mr-1"></i> Kembali ke Ringkasan
                     </a>
@@ -175,10 +163,10 @@
                                                 <span class="text-muted">(alternatif lain belum memiliki data kinerja)</span>
                                             @elseif($recDetail)
                                                Direkomendasikan: <strong>{{ $recDetail->supplier->nama_supplier ?? '-' }}</strong>
-                                                &mdash; Rp {{ number_format($recDetail->nilai_c1, 0, ',', '.') }}
-                                                &middot; estimasi tiba {{ (int) round($recDetail->nilai_c3) }} hari
+                                                &mdash; Rp {{ number_format($recDetail->nilai('C1'), 0, ',', '.') }}
+                                                &middot; estimasi tiba {{ (int) round($recDetail->nilai('C3')) }} hari
                                             @else
-                                                <span class="text-muted"><i class="fas fa-lock mr-1"></i>Belum bisa dihitung otomatis &mdash; lengkapi data konfirmasi harga lalu klik "Hitung Ulang Rekomendasi"</span>
+                                                <span class="text-muted"><i class="fas fa-lock mr-1"></i>Belum bisa dihitung otomatis &mdash; lengkapi data konfirmasi harga terlebih dahulu</span>
                                             @endif
                                         </small>
                                     @endif
@@ -396,6 +384,7 @@
                     <div class="card-body py-2 d-flex justify-content-between align-items-center flex-wrap" style="gap:.5rem;">
                         <button type="button" id="btnSimpanPilihan"
                                 data-formaction="{{ route('supplier.selection.save', $needlist->id) }}"
+                                data-sudah-dipilih-lengkap="{{ $sudahDipilihLengkap ? '1' : '0' }}"
                                 class="btn btn-outline-primary">
                             <i class="fas fa-save mr-1"></i> Simpan Pilihan
                         </button>

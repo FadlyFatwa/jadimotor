@@ -284,31 +284,21 @@ class SawService
                 $rawValues    = $matrix[$candidateKey];
                 $normValues   = $normalized[$candidateKey];
 
+                $rincianKriteria = [];
+                foreach ($kriterias as $k) {
+                    $rincianKriteria[$k->kode] = [
+                        'nilai'    => $rawValues[$k->kode]       ?? 0,
+                        'norm'     => $normValues[$k->kode]      ?? 0,
+                        'weighted' => $row['weighted'][$k->kode] ?? 0,
+                    ];
+                }
+
                 SawPerhitunganDetail::create([
                     'perhitungan_id' => $perhitungan->id,
                     'supplier_id'    => $row['supplier_id'],
                     'id_variasi'     => $row['id_variasi'],
 
-                    'nilai_c1' => $rawValues['C1'],
-                    'nilai_c2' => $rawValues['C2'],
-                    'nilai_c3' => $rawValues['C3'],
-                    'nilai_c4' => $rawValues['C4'],
-                    'nilai_c5' => $rawValues['C5'],
-                    'nilai_c6' => $rawValues['C6'],
-
-                    'norm_c1' => $normValues['C1'],
-                    'norm_c2' => $normValues['C2'],
-                    'norm_c3' => $normValues['C3'],
-                    'norm_c4' => $normValues['C4'],
-                    'norm_c5' => $normValues['C5'],
-                    'norm_c6' => $normValues['C6'],
-
-                    'weighted_c1' => $row['weighted']['C1'],
-                    'weighted_c2' => $row['weighted']['C2'],
-                    'weighted_c3' => $row['weighted']['C3'],
-                    'weighted_c4' => $row['weighted']['C4'],
-                    'weighted_c5' => $row['weighted']['C5'],
-                    'weighted_c6' => $row['weighted']['C6'],
+                    'rincian_kriteria' => $rincianKriteria,
 
                     'nilai_vi'       => $row['nilai_vi'],
                     'ranking'        => $row['ranking'],

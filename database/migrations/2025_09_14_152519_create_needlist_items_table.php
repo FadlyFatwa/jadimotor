@@ -13,17 +13,21 @@ return new class extends Migration
     {
         Schema::create('needlist_items', function (Blueprint $table) {
             $table->id();
+
             $table->unsignedBigInteger('needlist_id');
+            $table->foreign('needlist_id')
+                ->references('id')->on('needlists')->onDelete('cascade');
+
             $table->unsignedBigInteger('id_variasi');
+            $table->foreign('id_variasi')
+                ->references('id_variasi')->on('variasis')->onDelete('cascade');
+
             $table->integer('qty');
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->text('rejected_reason')->nullable();
             $table->text('keterangan')->nullable();
             $table->boolean('is_reference')->default(false);
             $table->timestamps();
-
-            $table->foreign('needlist_id')->references('id')->on('needlists')->onDelete('cascade');
-            $table->foreign('id_variasi')->references('id_variasi')->on('variasis')->onDelete('cascade');
         });
     }
 

@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class SupplierInquiryItem extends Model
 {
+    use HasFactory;
+
     protected $fillable = ['inquiry_id', 'id_variasi', 'qty','status', 'harga_penawaran', 'estimasi_pengiriman'];
 
     protected $casts = ['qty' => 'integer'];

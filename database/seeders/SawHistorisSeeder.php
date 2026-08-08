@@ -5,7 +5,9 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use App\Models\Supplier;
+use App\Models\SawKriteria;
 use App\Models\SawNilaiHistoris;
+use App\Models\SawNilaiHistorisDetail;
 
 /**
  * Data historis performa supplier untuk kalkulasi SAW.
@@ -26,9 +28,11 @@ class SawHistorisSeeder extends Seeder
 {
     public function run(): void
     {
+        DB::table('saw_nilai_historis_detail')->truncate();
         DB::table('saw_nilai_historis')->truncate();
 
         $sup = fn(string $kode) => Supplier::where('kode_supplier', $kode)->value('id_supplier');
+        $kriteriaIds = SawKriteria::whereIn('kode', ['C2', 'C3', 'C4', 'C5', 'C6'])->pluck('id', 'kode');
 
         // Periode historis: tahun lalu (Jan–Des 2025)
         $dari  = '2025-01-01';
@@ -139,22 +143,34 @@ class SawHistorisSeeder extends Seeder
                 continue;
             }
 
-            SawNilaiHistoris::create([
-                'supplier_id'              => $supplierId,
-                'periode_mulai'            => $dari,
-                'periode_akhir'            => $sampai,
-                'termin_pembayaran'        => $row['termin_pembayaran'],
-                'lead_time'                => $row['lead_time'],
-                'lead_time_manual'         => $row['lead_time'],
-                'akurasi_kuantitas'        => $row['akurasi_kuantitas'],
-                'akurasi_kuantitas_manual' => $row['akurasi_kuantitas'],
-                'tingkat_pemenuhan'        => $row['tingkat_pemenuhan'],
-                'tingkat_pemenuhan_manual' => $row['tingkat_pemenuhan'],
-                'komunikasi'               => $row['komunikasi'],
-                'jumlah_transaksi'         => $row['jumlah_transaksi'],
-                'jumlah_transaksi_manual'  => $row['jumlah_transaksi'],
-                'catatan'                  => $row['catatan'],
+            $historis = SawNilaiHistoris::create([
+                'supplier_id'             => $supplierId,
+                'periode_mulai'           => $dari,
+                'periode_akhir'           => $sampai,
+                'jumlah_transaksi'        => $row['jumlah_transaksi'],
+                'jumlah_transaksi_manual' => $row['jumlah_transaksi'],
+                'catatan'                 => $row['catatan'],
             ]);
+
+            $nilaiPerKode = [
+                'C2' => $row['termin_pembayaran'],
+                'C3' => $row['lead_time'],
+                'C4' => $row['akurasi_kuantitas'],
+                'C5' => $row['tingkat_pemenuhan'],
+                'C6' => $row['komunikasi'],
+            ];
+
+            foreach ($nilaiPerKode as $kode => $nilai) {
+                if (!isset($kriteriaIds[$kode])) {
+                    continue;
+                }
+
+                SawNilaiHistorisDetail::create([
+                    'historis_id' => $historis->id,
+                    'kriteria_id' => $kriteriaIds[$kode],
+                    'nilai'       => $nilai,
+                ]);
+            }
         }
 
         $this->command->info('✓ SawHistorisSeeder: '.count($data).' supplier dengan data historis.');

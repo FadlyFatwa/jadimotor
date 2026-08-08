@@ -1,5 +1,5 @@
 @extends('layouts.main')
-@section('title', 'Data Historis Kinerja')
+@section('title', 'Data Historis Kinerja Supplier')
 
 @php
     // Bagian Pembelian (role 'procurement') hanya boleh melihat data ini.
@@ -37,7 +37,11 @@
         <strong>C3</strong> Lead Time (hari) &nbsp;|&nbsp;
         <strong>C4</strong> Akurasi Kuantitas (%) &nbsp;|&nbsp;
         <strong>C5</strong> Tingkat Pemenuhan (%) &nbsp;|&nbsp;
-        <strong>C6</strong> Komunikasi &nbsp;—&nbsp;
+        <strong>C6</strong> Komunikasi
+        @foreach($kriteriaCustom as $k)
+            &nbsp;|&nbsp; <strong>{{ $k->kode }}</strong> {{ $k->nama }}
+        @endforeach
+        &nbsp;—&nbsp;
         <small>C1 (Harga) diambil dari Supplier Inquiry.</small>
     </div>
 
@@ -73,6 +77,9 @@
                             <th class="py-3 text-secondary">C4 Akurasi</th>
                             <th class="py-3 text-secondary">C5 Pemenuhan</th>
                             <th class="py-3 text-secondary">C6 Komunikasi</th>
+                            @foreach($kriteriaCustom as $k)
+                                <th class="py-3 text-secondary">{{ $k->kode }} {{ $k->nama }}</th>
+                            @endforeach
                             <th class="py-3 text-secondary">Transaksi</th>
                             <th class="py-3 text-secondary" style="width:110px">Aksi</th>
                         </tr>
@@ -81,9 +88,19 @@
                         @php
                             $terminLabel = [1=>'Cash/Muka', 2=>'14 Hari', 3=>'30 Hari', 4=>'60 Hari', 5=>'90+ Hari'];
                             $komLabel    = [1=>'Sangat Buruk', 2=>'Buruk', 3=>'Cukup', 4=>'Baik', 5=>'Sangat Baik'];
-                            $komBadge    = [1=>'danger', 2=>'warning', 3=>'secondary', 4=>'info', 5=>'success'];
+                            $fmtNum = function ($v) {
+                                $s = rtrim(rtrim(number_format((float) $v, 4, '.', ''), '0'), '.');
+                                return $s === '' ? '0' : $s;
+                            };
                         @endphp
                         @forelse($historis as $i => $h)
+                            @php
+                                $c2 = $h->details->first(fn($d) => $d->kriteria?->kode === 'C2');
+                                $c3 = $h->details->first(fn($d) => $d->kriteria?->kode === 'C3');
+                                $c4 = $h->details->first(fn($d) => $d->kriteria?->kode === 'C4');
+                                $c5 = $h->details->first(fn($d) => $d->kriteria?->kode === 'C5');
+                                $c6 = $h->details->first(fn($d) => $d->kriteria?->kode === 'C6');
+                            @endphp
                             <tr>
                                 <td class="text-center">{{ $historis->firstItem() + $i }}</td>
                                 <td>{{ $h->supplier->nama_supplier ?? '-' }}</td>
@@ -93,37 +110,38 @@
                                     {{ \Carbon\Carbon::parse($h->periode_akhir)->format('d/m/Y') }}
                                 </td>
                                 <td class="text-center">
-                                    @if($h->termin_pembayaran !== null)
-                                        <span class="badge badge-info">{{ $h->termin_pembayaran }}</span>
-                                        <br><small class="text-muted">{{ $terminLabel[$h->termin_pembayaran] ?? '-' }}</small>
+                                    @if($c2 !== null)
+                                        {{ $terminLabel[(int) $c2->nilai] ?? '-' }}
                                     @else <span class="text-muted">-</span> @endif
                                 </td>
                                 <td class="text-center">
-                                    @if($h->lead_time !== null)
-                                        {{ $h->lead_time }} hari
+                                    @if($c3 !== null)
+                                        {{ $fmtNum($c3->nilai) }} hari
                                     @else <span class="text-muted">-</span> @endif
                                 </td>
                                 <td class="text-center">
-                                    @if($h->akurasi_kuantitas !== null)
-                                        <span class="badge badge-{{ $h->akurasi_kuantitas >= 90 ? 'success' : ($h->akurasi_kuantitas >= 70 ? 'warning' : 'danger') }}">
-                                            {{ $h->akurasi_kuantitas }}%
-                                        </span>
+                                    @if($c4 !== null)
+                                        <span class="{{ $c4->nilai < 70 ? 'text-danger font-weight-bold' : '' }}">{{ $fmtNum($c4->nilai) }}%</span>
                                     @else <span class="text-muted">-</span> @endif
                                 </td>
                                 <td class="text-center">
-                                    @if($h->tingkat_pemenuhan !== null)
-                                        <span class="badge badge-{{ $h->tingkat_pemenuhan >= 90 ? 'success' : ($h->tingkat_pemenuhan >= 70 ? 'warning' : 'danger') }}">
-                                            {{ $h->tingkat_pemenuhan }}%
-                                        </span>
+                                    @if($c5 !== null)
+                                        <span class="{{ $c5->nilai < 70 ? 'text-danger font-weight-bold' : '' }}">{{ $fmtNum($c5->nilai) }}%</span>
                                     @else <span class="text-muted">-</span> @endif
                                 </td>
                                 <td class="text-center">
-                                    @if($h->komunikasi !== null)
-                                        <span class="badge badge-{{ $komBadge[$h->komunikasi] ?? 'secondary' }}">
-                                            {{ $h->komunikasi }} — {{ $komLabel[$h->komunikasi] ?? '-' }}
-                                        </span>
+                                    @if($c6 !== null)
+                                        <span class="{{ (int) $c6->nilai <= 2 ? 'text-danger font-weight-bold' : '' }}">{{ $komLabel[(int) $c6->nilai] ?? '-' }}</span>
                                     @else <span class="text-muted">-</span> @endif
                                 </td>
+                                @foreach($kriteriaCustom as $k)
+                                    @php $dCustom = $h->details->firstWhere('kriteria_id', $k->id); @endphp
+                                    <td class="text-center">
+                                        @if($dCustom)
+                                            {{ $fmtNum($dCustom->nilai) }}
+                                        @else <span class="text-muted">-</span> @endif
+                                    </td>
+                                @endforeach
                                 <td class="text-center">{{ $h->jumlah_transaksi }}</td>
                                 <td class="text-center">
                                     @if($canManageHistoris)
@@ -131,6 +149,11 @@
                                            class="btn btn-xs btn-outline-warning" title="Edit">
                                             <i class="fas fa-edit"></i>
                                         </a>
+                                        <form method="POST" action="{{ route('saw.historis.destroy', $h->id) }}" class="d-inline"
+                                              data-confirm="Hapus data kinerja supplier {{ $h->supplier->nama_supplier ?? '' }}? Data ini dipakai sebagai input perhitungan SAW.">
+                                            @csrf @method('DELETE')
+                                            <button class="btn btn-xs btn-outline-danger" title="Hapus"><i class="fas fa-trash"></i></button>
+                                        </form>
                                     @else
                                         <span class="text-muted">&mdash;</span>
                                     @endif
@@ -138,7 +161,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="text-center text-muted py-5">
+                                <td colspan="{{ 10 + $kriteriaCustom->count() }}" class="text-center text-muted py-5">
                                     <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
                                     Belum ada data historis.
                                     @if($canManageHistoris)

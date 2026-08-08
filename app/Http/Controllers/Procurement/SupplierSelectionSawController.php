@@ -17,47 +17,6 @@ class SupplierSelectionSawController extends Controller
     ) {}
 
     // =========================================================================
-    // PUBLIC: Hitung SAW untuk SEMUA kelompok dalam satu needlist — endpoint AJAX
-    // =========================================================================
-
-    /**
-     * POST /procurement/pemilihan-supplier/{needlist}/rekomendasi-semua
-     * Hitung SAW untuk seluruh kelompok (master barang x cluster kendaraan x tier)
-     * dalam satu needlist yang punya minimal 2 supplier, dalam satu request.
-     */
-    public function hitungSemua(Request $request, $needlist)
-    {
-        $needlistId = (int) $needlist;
-
-        $needlist = Needlist::with([
-            'details',
-            'supplierInquiries.supplier',
-            'supplierInquiries.items.variasi.m_barang',
-            'supplierInquiries.items.variasi.vehicleGenerations.vehicle',
-        ])->findOrFail($needlistId);
-
-        // Tombol ini = "Hitung Ulang" eksplisit, jadi paksa hitung ulang SEMUA
-        // kelompok (>=2 supplier), termasuk yang sudah pernah dihitung sebelumnya.
-        try {
-            $results = $this->batchCalculator->calculateForNeedlist($needlist);
-        } catch (\RuntimeException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
-        }
-
-        if (empty($results)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tidak ada kelompok dengan minimal 2 supplier yang bisa dihitung.',
-            ], 422);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data'    => $results,
-        ]);
-    }
-
-    // =========================================================================
     // PUBLIC: Detail Perhitungan SAW (untuk modal laporan)
     // =========================================================================
 
@@ -75,12 +34,7 @@ class SupplierSelectionSawController extends Controller
             'supplier'   => $d->supplier->nama_supplier ?? '-',
             'id_variasi'   => $d->id_variasi,
             'nama_variasi' => $d->variasi->nama_variasi ?? null,
-            'nilai_c1'   => $d->nilai_c1,  'norm_c1'   => $d->norm_c1,  'weighted_c1' => $d->weighted_c1,
-            'nilai_c2'   => $d->nilai_c2,  'norm_c2'   => $d->norm_c2,  'weighted_c2' => $d->weighted_c2,
-            'nilai_c3'   => $d->nilai_c3,  'norm_c3'   => $d->norm_c3,  'weighted_c3' => $d->weighted_c3,
-            'nilai_c4'   => $d->nilai_c4,  'norm_c4'   => $d->norm_c4,  'weighted_c4' => $d->weighted_c4,
-            'nilai_c5'   => $d->nilai_c5,  'norm_c5'   => $d->norm_c5,  'weighted_c5' => $d->weighted_c5,
-            'nilai_c6'   => $d->nilai_c6,  'norm_c6'   => $d->norm_c6,  'weighted_c6' => $d->weighted_c6,
+            'rincian_kriteria' => $d->rincian_kriteria,
             'nilai_vi'   => $d->nilai_vi,
             'ranking'    => $d->ranking,
             'is_recommended' => $d->is_recommended,

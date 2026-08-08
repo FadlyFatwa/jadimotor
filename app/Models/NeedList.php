@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Needlist extends Model
 {
+    use HasFactory;
+
     protected $fillable = ['kode_needlist', 'user_id', 'status', 'approval_notes', 'approved_by', 'approved_at', 'approval_status'];
 
     // public function items()

@@ -3,8 +3,12 @@
 namespace App\Services;
 
 use App\Models\Needlist;
+use App\Models\SawKriteria;
 use App\Models\SawNilaiHistoris;
+use App\Models\SawNilaiHistorisDetail;
+use App\Models\SawPerhitungan;
 use App\Models\SupplierInquiry;
+use App\Models\SupplierInquiryItem;
 use Carbon\Carbon;
 
 /**
@@ -110,6 +114,59 @@ class SawBatchCalculator
         }
 
         return $results;
+    }
+
+    /**
+     * Tier key yang AMAN dilewati (tidak perlu dihitung ulang) saat
+     * calculateForNeedlist() dipanggil — gabungan dari:
+     *   - kelompok yang sudah dikonfirmasi user (UC-04, punya SawRekomendasi)
+     *     → selalu skip, apa pun yang berubah setelahnya (keputusan terkunci).
+     *   - kelompok yang belum dikonfirmasi TAPI datanya belum berubah sejak
+     *     kalkulasi terakhir — dicek dari 3 sumber: harga/estimasi penawaran
+     *     (supplier_inquiry_items), nilai kinerja supplier
+     *     (saw_nilai_historis_detail), dan bobot/kriteria (saw_kriteria, global).
+     *
+     * Kelompok yang belum pernah dihitung sama sekali TIDAK masuk sini — itu
+     * memang harus dihitung, bukan "aman di-skip".
+     */
+    public function determineSkipTierKeys(Needlist $needlist): array
+    {
+        $perhitungans = SawPerhitungan::where('needlist_id', $needlist->id)
+            ->whereNotNull('tier_key')
+            ->with(['details', 'rekomendasi'])
+            ->get();
+
+        $kriteriaUpdatedAt = SawKriteria::max('updated_at');
+
+        $skip = [];
+        foreach ($perhitungans as $p) {
+            if ($p->rekomendasi) {
+                $skip[] = $p->tier_key;
+                continue;
+            }
+
+            $variasiIds  = $p->details->pluck('id_variasi')->filter()->unique()->values();
+            $supplierIds = $p->details->pluck('supplier_id')->unique()->values();
+
+            $inquiryUpdatedAt = SupplierInquiryItem::whereIn('id_variasi', $variasiIds)
+                ->whereHas('inquiry', fn ($q) => $q->where('needlist_id', $needlist->id))
+                ->max('updated_at');
+
+            $historisUpdatedAt = SawNilaiHistorisDetail::whereHas(
+                'historis', fn ($q) => $q->whereIn('supplier_id', $supplierIds)
+            )->max('updated_at');
+
+            $latestRelevant = collect([$inquiryUpdatedAt, $historisUpdatedAt, $kriteriaUpdatedAt])
+                ->filter()
+                ->map(fn ($v) => Carbon::parse($v))
+                ->max();
+
+            if ($latestRelevant === null || $latestRelevant->lte($p->calculated_at)) {
+                $skip[] = $p->tier_key;
+            }
+        }
+
+        return $skip;
     }
 
     /**
@@ -250,6 +307,11 @@ class SawBatchCalculator
      */
     private function mergeWithHistoris(array $inquiryData): array
     {
+        // Semua kriteria di luar C1 (yang selalu dari inquiry) diinput manual
+        // lewat form Kinerja Supplier dan tersimpan generik di
+        // saw_nilai_historis_detail per kode — termasuk C2-C6.
+        $kriteriaDinamis = SawKriteria::aktif()->where('kode', '!=', 'C1')->get();
+
         // Lookup 1x per supplier unik (bukan per baris) supaya supplier dengan
         // beberapa variasi dalam kelompok ini tidak query historis berulang.
         $historisBySupplier = [];
@@ -257,6 +319,7 @@ class SawBatchCalculator
             $supplierId = $row['supplier_id'];
             if (!array_key_exists($supplierId, $historisBySupplier)) {
                 $historisBySupplier[$supplierId] = SawNilaiHistoris::where('supplier_id', $supplierId)
+                    ->with('details')
                     ->orderByDesc('periode_akhir')
                     ->first();
             }
@@ -266,15 +329,23 @@ class SawBatchCalculator
             $historis = $historisBySupplier[$row['supplier_id']];
 
             if ($historis) {
-                $row['C2']          = (float) ($historis->termin_pembayaran ?? 0);
-                // C3: gunakan lead_time dari historis jika tersedia, fallback ke inquiry
-                if (!is_null($historis->lead_time) && $historis->lead_time > 0) {
-                    $row['C3']          = (float) $historis->lead_time;
-                    $row['_sumber_c3']  = 'historis';
+                foreach ($kriteriaDinamis as $k) {
+                    $detail = $historis->details->firstWhere('kriteria_id', $k->id);
+                    $nilai  = (float) ($detail->nilai ?? 0);
+
+                    if ($k->kode === 'C3') {
+                        // C3: gunakan lead_time dari historis jika tersedia (>0),
+                        // kalau tidak biarkan nilai dari inquiry (sudah di-set sebelumnya).
+                        if ($nilai > 0) {
+                            $row['C3']         = $nilai;
+                            $row['_sumber_c3'] = 'historis';
+                        }
+                        continue;
+                    }
+
+                    $row[$k->kode] = $nilai;
                 }
-                $row['C4']          = (float) ($historis->akurasi_kuantitas ?? 0);
-                $row['C5']          = (float) ($historis->tingkat_pemenuhan ?? 0);
-                $row['C6']          = (float) ($historis->komunikasi ?? 0);
+
                 $row['_has_historis'] = true;
                 $row['_excluded']     = false;
             } else {

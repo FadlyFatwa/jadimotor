@@ -261,7 +261,7 @@
         </div>
     </div>
 
-    <div class="card shadow-sm">
+    <div class="card shadow-sm" style="position:sticky; bottom:0; z-index:1020;">
         <div class="card-body py-3 d-flex justify-content-end">
             <a href="{{ route('pemilihan-supplier.show', $needlist->id) }}" class="btn btn-primary">
                 Lanjut ke Pilih Supplier <i class="fas fa-arrow-right ml-1"></i>

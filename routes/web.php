@@ -161,16 +161,17 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('penjualan')->name('penjualan.')->group(function () {
         Route::get('/', [PenjualanController::class, 'index'])->name('index');
         Route::post('/', [PenjualanController::class, 'store'])->name('store');
-        Route::get('/{penjualan}', [PenjualanController::class, 'show'])->name('show');
-        Route::delete('/{penjualan}', [PenjualanController::class, 'destroy'])->name('destroy');
 
         Route::prefix('cart')->name('cart.')->group(function () {
             Route::get('/', [PenjualanController::class, 'getCart'])->name('get');
             Route::post('/', [PenjualanController::class, 'addToCart'])->name('add');
+            Route::delete('/cancel', [PenjualanController::class, 'clearCart'])->name('clear');
             Route::put('/{cart}', [PenjualanController::class, 'updateCart'])->name('update');
             Route::delete('/{cart}', [PenjualanController::class, 'removeFromCart'])->name('destroy');
-            Route::delete('/cancel', [PenjualanController::class, 'clearCart'])->name('clear');
         });
+
+        Route::get('/{penjualan}', [PenjualanController::class, 'show'])->name('show');
+        Route::delete('/{penjualan}', [PenjualanController::class, 'destroy'])->name('destroy');
     });
 
     // ===================================================
@@ -246,7 +247,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/',               [SawKriteriaController::class, 'index'])->name('index');
         Route::get('/create',         [SawKriteriaController::class, 'create'])->name('create');
         Route::post('/',              [SawKriteriaController::class, 'store'])->name('store');
-        Route::post('/normalize',     [SawKriteriaController::class, 'normalize'])->name('normalize');
         Route::get('/{kriteria}/edit',[SawKriteriaController::class, 'edit'])->name('edit');
         Route::put('/{kriteria}',     [SawKriteriaController::class, 'update'])->name('update');
         Route::delete('/{kriteria}',  [SawKriteriaController::class, 'destroy'])->name('destroy');
@@ -259,7 +259,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/',                          [SupplierRecommendationController::class, 'index'])->name('index');
         Route::get('/{needlist}/ringkasan',      [SupplierRecommendationController::class, 'ringkasan'])->name('ringkasan');
         Route::get('/{needlist}',                [SupplierRecommendationController::class, 'show'])->name('show');
-        Route::post('/{needlist}/rekomendasi-semua', [SupplierSelectionSawController::class, 'hitungSemua'])->name('rekomendasi-semua');
     });
 
     // ===================================================

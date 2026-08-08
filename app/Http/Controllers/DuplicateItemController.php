@@ -215,18 +215,16 @@ class DuplicateItemController extends Controller
             );
         }
 
-        if ($namaVariasiBaru !== $namaVariasiLama) {
-            ItemCategorizationLog::create([
-                'id_variasi' => $target->id_variasi,
-                'barcode' => $target->barcode,
-                'nama_variasi_lama' => $namaVariasiLama,
-                'nama_variasi_baru' => $namaVariasiBaru,
-                'id_barang_baru' => $mbarang->id_barang,
-                'part_number_baru' => $target->part_number,
-                'dikategorikan_oleh' => auth()->id(),
-                'dikategorikan_at' => now(),
-            ]);
-        }
+        ItemCategorizationLog::create([
+            'id_variasi' => $target->id_variasi,
+            'barcode' => $target->barcode,
+            'nama_variasi_lama' => $namaVariasiLama,
+            'nama_variasi_baru' => $namaVariasiBaru,
+            'id_barang_baru' => $mbarang->id_barang,
+            'part_number_baru' => $target->part_number,
+            'dikategorikan_oleh' => auth()->id(),
+            'dikategorikan_at' => now(),
+        ]);
 
         return $mbarang;
     }

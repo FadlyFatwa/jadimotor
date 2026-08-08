@@ -13,7 +13,7 @@ class PelangganController extends Controller
     public function index()
     {
         $pelanggans = Pelanggan::latest()->paginate(10);
-        return view('pelanggan.index', compact('pelanggans'));
+        return view('pages.pelanggan.index', compact('pelanggans'));
     }
 
     /**
@@ -21,7 +21,7 @@ class PelangganController extends Controller
      */
     public function create()
     {
-        return view('pelanggan.form');
+        return view('pages.pelanggan.form');
     }
 
     /**
@@ -48,7 +48,7 @@ class PelangganController extends Controller
     public function edit($id)
     {
         $pelanggan = Pelanggan::findOrFail($id);
-        return view('pelanggan.form', compact('pelanggan'));
+        return view('pages.pelanggan.form', compact('pelanggan'));
     }
 
     /**

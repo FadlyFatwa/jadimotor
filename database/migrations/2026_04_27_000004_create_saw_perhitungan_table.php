@@ -10,9 +10,18 @@ return new class extends Migration
     {
         Schema::create('saw_perhitungan', function (Blueprint $table) {
             $table->id();
+
             $table->unsignedBigInteger('needlist_id');
+            $table->foreign('needlist_id')
+                ->references('id')->on('needlists')->onDelete('cascade');
+
             $table->unsignedBigInteger('id_variasi')->nullable();  // null jika SAW per master barang
+            $table->foreign('id_variasi')
+                ->references('id_variasi')->on('variasis')->onDelete('cascade');
+
             $table->unsignedBigInteger('id_barang')->nullable();   // diisi jika SAW per master barang
+            $table->foreign('id_barang')
+                ->references('id_barang')->on('m_barangs')->onDelete('cascade');
 
             // Hash unik per kombinasi cluster+tier dalam satu master barang.
             // Value = md5(sorted variasi_ids) — membedakan OEM vs Original vs KW.
@@ -21,17 +30,12 @@ return new class extends Migration
             $table->json('bobot_snapshot');
             $table->enum('status', ['draft', 'final'])->default('draft');
             $table->timestamp('calculated_at')->nullable();
-            $table->unsignedBigInteger('calculated_by')->nullable();
-            $table->timestamps();
 
-            $table->foreign('needlist_id')
-                ->references('id')->on('needlists')->onDelete('cascade');
-            $table->foreign('id_variasi')
-                ->references('id_variasi')->on('variasis')->onDelete('cascade');
-            $table->foreign('id_barang')
-                ->references('id_barang')->on('m_barangs')->onDelete('cascade');
+            $table->unsignedBigInteger('calculated_by')->nullable();
             $table->foreign('calculated_by')
                 ->references('id')->on('users')->onDelete('set null');
+
+            $table->timestamps();
 
             $table->index(['needlist_id', 'id_barang']);
             $table->index(['needlist_id', 'id_variasi']);

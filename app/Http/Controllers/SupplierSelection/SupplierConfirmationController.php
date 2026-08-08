@@ -103,7 +103,7 @@ class SupplierConfirmationController extends Controller
         $this->recordSawRekomendasi($needlist->id, $inquiryIds);
 
         return redirect()
-            ->to(route('needlist.show', $needlist_id) . '#pane-selection')
+            ->route('pemilihan-supplier.index')
             ->with('success', 'Pilihan berhasil disimpan.');
     }
 

@@ -12,13 +12,16 @@ class DetailPenerimaan extends Model
     // Nama tabel
     protected $table = 'detail_penerimaans';
 
-    // Primary key kustom
-    protected $primaryKey = 'ID_detail_penerimaan';
+    // Primary key kustom (matches the actual `id_detail_penerimaan` column;
+    // was previously "ID_detail_penerimaan", which never matched a real column).
+    protected $primaryKey = 'id_detail_penerimaan';
 
-    // Kolom yang dapat diisi secara massal
+    // Kolom yang dapat diisi secara massal (id_penerimaan/id_variasi are the
+    // real FK columns from the migration — the old fillable used
+    // "ID_Penerimaan"/"ID_Barang" which don't exist as columns).
     protected $fillable = [
-        'ID_Penerimaan',
-        'ID_Barang',
+        'id_penerimaan',
+        'id_variasi',
         'Jumlah',
         'Harga',
         'Total',
@@ -29,17 +32,12 @@ class DetailPenerimaan extends Model
     // Relasi ke tabel penerimaans
     public function penerimaan()
     {
-        return $this->belongsTo(Penerimaan::class, 'ID_Penerimaan', 'ID_Penerimaan');
+        return $this->belongsTo(Penerimaan::class, 'id_penerimaan', 'id_penerimaan');
     }
 
-    // Relasi ke tabel barangs
+    // Relasi ke variasi (App\Models\Barang does not exist in this codebase).
     public function barang()
     {
-        return $this->belongsTo(Barang::class, 'ID_Barang', 'ID_Barang');
-    }
-
-    public function supplier()
-    {
-    return $this->belongsTo(Supplier::class, 'id_supplier', 'id_supplier');
+        return $this->belongsTo(Variasi::class, 'id_variasi', 'id_variasi');
     }
 }

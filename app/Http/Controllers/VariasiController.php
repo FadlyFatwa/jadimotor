@@ -87,6 +87,9 @@ class VariasiController extends Controller
             'supplier_data' => 'required|array|min:1',
             'supplier_data.*.id_supplier' => 'required|exists:suppliers,id_supplier|distinct',
             'supplier_data.*.harga_beli' => 'required|numeric|min:0',
+            'supplier_data.*.harga_list' => 'required|numeric|min:0',
+            'supplier_data.*.kode_list' => 'required|string|max:20',
+            'supplier_data.*.kode_beli' => 'required|string|max:20',
             // 'supplier_data.*.jarak' => 'nullable|integer|min:0',
             // 'supplier_data.*.waktu_pengiriman' => 'nullable|integer|min:0',
         ]);
@@ -176,6 +179,9 @@ class VariasiController extends Controller
             'supplier_data' => 'required|array|min:1',
             'supplier_data.*.id_supplier' => 'required|exists:suppliers,id_supplier|distinct',
             'supplier_data.*.harga_beli' => 'required|numeric|min:0',
+            'supplier_data.*.harga_list' => 'required|numeric|min:0',
+            'supplier_data.*.kode_list' => 'required|string|max:20',
+            'supplier_data.*.kode_beli' => 'required|string|max:20',
         ]);
 
         if ($validator->fails()) {
@@ -231,6 +237,14 @@ class VariasiController extends Controller
         }
     }
 
+    public function destroy($id)
+    {
+        $variasi = Variasi::findOrFail($id);
+        $variasi->delete();
+
+        return redirect()->route('barang.index')->with('success', 'Variasi berhasil dihapus.');
+    }
+
     /**
      * Bersihkan pemisah ribuan (titik/koma) dari input harga sebelum divalidasi.
      * Input dikirim sudah terformat ala Indonesia (mis. "1.450.000") oleh JS form,
@@ -261,8 +275,8 @@ class VariasiController extends Controller
     public function cariByBarcode(Request $request)
     {
         $barcode = $request->barcode;
-        
-        $produk = ProdukVariasi::with('masterBarang')->where('barcode', $barcode)->first();
+
+        $produk = Variasi::with('m_barang')->where('barcode', $barcode)->first();
 
         if (!$produk) {
             return response()->json(['status' => 'error', 'message' => 'Barang tidak ditemukan'], 404);
@@ -273,7 +287,7 @@ class VariasiController extends Controller
             'data' => [
                 'id' => $produk->id_variasi,
                 'nama' => $produk->nama_variasi,
-                'nama_barang' => $produk->Barang->nama_barang,
+                'nama_barang' => $produk->m_barang->nama_barang ?? '-',
                 'harga_jual' => $produk->harga_jual,
                 'stock' => $produk->stock
             ]
@@ -286,12 +300,13 @@ public function createMultiple()
         $kategoris = Kategori::all();
         $suppliers = Supplier::all();
         $m_barangs = MBarang::all();
+        $units     = Unit::all();
 
         // Generate nextBarcode
         $lastBarang = Variasi::orderBy('id_variasi', 'desc')->first();
         $nextBarcode = $lastBarang ? str_pad((int)$lastBarang->barcode + 1, 5, '0', STR_PAD_LEFT) : '00001';
 
-        return view('pages.variasi.form_multiple', compact('kategoris', 'suppliers', 'm_barangs', 'nextBarcode'));
+        return view('pages.variasi.form_multiple', compact('kategoris', 'suppliers', 'm_barangs', 'units', 'nextBarcode'));
     }
 
     public function storeMultiple(Request $request)

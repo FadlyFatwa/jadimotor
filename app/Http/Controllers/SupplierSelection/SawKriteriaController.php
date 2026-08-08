@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SupplierSelection;
 
 use App\Http\Controllers\Controller;
 use App\Models\SawKriteria;
+use App\Models\SawNilaiHistorisDetail;
 use Illuminate\Http\Request;
 
 class SawKriteriaController extends Controller
@@ -72,52 +73,27 @@ class SawKriteriaController extends Controller
     {
         $this->denyViewOnly();
 
+        // C1-C6 adalah kriteria inti — kode-nya dipakai langsung sebagai sumber
+        // data spesifik di SawBatchCalculator (C1=harga inquiry, C2/C4/C5/C6=
+        // kolom fixed saw_nilai_historis, C3=lead time). Menghapusnya akan
+        // merusak pipeline kalkulasi, bukan cuma "menghilangkan kriteria".
+        if (in_array($kriteria->kode, ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'], true)) {
+            return redirect()->route('saw.kriteria.index')
+                ->with('error', "Kriteria {$kriteria->kode} adalah kriteria inti sistem dan tidak bisa dihapus. "
+                    . 'Nonaktifkan saja (ubah status) kalau ingin dikecualikan dari perhitungan.');
+        }
+
+        $sudahDipakai = SawNilaiHistorisDetail::where('kriteria_id', $kriteria->id)->exists();
+        if ($sudahDipakai) {
+            return redirect()->route('saw.kriteria.index')
+                ->with('error', "Kriteria {$kriteria->kode} sudah memiliki data historis kinerja supplier yang terisi, "
+                    . 'tidak bisa dihapus permanen. Nonaktifkan saja (ubah status) supaya data historisnya tetap tersimpan.');
+        }
+
         $kriteria->delete();
 
         return redirect()->route('saw.kriteria.index')
             ->with('success', "Kriteria {$kriteria->kode} berhasil dihapus.");
-    }
-
-    /**
-     * Skalakan ulang bobot semua kriteria aktif secara proporsional supaya
-     * totalnya tepat 1.0, dengan tiap bobot dibulatkan ke kelipatan 0.05 (5%)
-     * agar angkanya rapi. Pakai largest-remainder method: bagi 1.0 jadi 20
-     * "slot" 0.05, alokasikan slot bulat dulu, sisa slot diberikan ke
-     * kriteria dengan sisa pecahan terbesar — supaya total tetap persis 1.0.
-     */
-    public function normalize()
-    {
-        $this->denyViewOnly();
-
-        $aktif = SawKriteria::where('is_active', 1)->orderBy('urutan')->get();
-        $total = $aktif->sum('bobot');
-
-        if ($aktif->isEmpty() || $total <= 0) {
-            return redirect()->route('saw.kriteria.index')
-                ->with('error', 'Tidak ada kriteria aktif dengan bobot > 0 untuk dinormalisasi.');
-        }
-
-        $totalSlot = 20; // 20 x 0.05 = 1.0
-        $slotMentah = $aktif->map(fn ($k) => ((float) $k->bobot) / $total * $totalSlot);
-        $slotDasar  = $slotMentah->map(fn ($v) => (int) floor($v));
-        $sisaSlot   = $totalSlot - $slotDasar->sum();
-
-        $urutanSisa = $slotMentah->keys()
-            ->sortByDesc(fn ($i) => $slotMentah[$i] - $slotDasar[$i])
-            ->values();
-
-        $slotFinal = $slotDasar;
-        for ($i = 0; $i < $sisaSlot; $i++) {
-            $idx = $urutanSisa[$i];
-            $slotFinal[$idx] = $slotFinal[$idx] + 1;
-        }
-
-        $aktif->values()->each(function ($k, $i) use ($slotFinal) {
-            $k->update(['bobot' => round($slotFinal[$i] * 0.05, 2)]);
-        });
-
-        return redirect()->route('saw.kriteria.index')
-            ->with('success', 'Bobot kriteria aktif berhasil dinormalisasi ke kelipatan 5%, total kini 100%.');
     }
 
     /**

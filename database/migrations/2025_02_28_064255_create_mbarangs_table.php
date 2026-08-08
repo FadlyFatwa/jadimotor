@@ -19,7 +19,8 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
 
             $table->unsignedBigInteger('id_kategori');
-            $table->foreign('id_kategori')->references('id_kategori')->on('kategoris')->onDelete('cascade');
+            $table->foreign('id_kategori')
+                ->references('id_kategori')->on('kategoris')->onDelete('cascade');
 
             $table->timestamps();
         });

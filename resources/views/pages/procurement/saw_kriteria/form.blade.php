@@ -1,5 +1,5 @@
 @extends('layouts.main')
-@section('title', isset($kriteria) ? 'Edit Kriteria SAW' : 'Tambah Kriteria SAW')
+@section('title', isset($kriteria) ? 'Edit Kriteria Pemilihan Supplier' : 'Tambah Kriteria Pemilihan Supplier')
 
 @section('content')
 <div class="container-fluid">
@@ -8,9 +8,9 @@
         <div class="card-body d-flex justify-content-between align-items-center">
             <div>
                 <h4 class="mb-1">
-                    {{ isset($kriteria) ? 'Edit' : 'Tambah' }} Kriteria SAW
+                    {{ isset($kriteria) ? 'Edit' : 'Tambah' }} Kriteria Pemilihan Supplier
                 </h4>
-                <small class="text-muted">Atur kriteria dan bobot yang dipakai dalam perhitungan SAW</small>
+                <small class="text-muted">Atur kriteria dan bobot yang dipakai dalam perhitungan rekomendasi supplier</small>
             </div>
             <a href="{{ route('saw.kriteria.index') }}" class="btn btn-sm btn-outline-secondary">
                 <i class="fas fa-arrow-left mr-1"></i> Kembali

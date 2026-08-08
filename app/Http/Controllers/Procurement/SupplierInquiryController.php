@@ -49,21 +49,20 @@ class SupplierInquiryController extends Controller
         $variasiQtyMap = $activeItems->keyBy('id_variasi')->map(fn($d) => $d->qty);
 
         foreach ($supplierToVariasiIds as $supplierId => $svVariasiIds) {
-            // Skip jika inquiry untuk supplier ini sudah ada
-            if (SupplierInquiry::where('needlist_id', $needlist_id)
-                ->where('supplier_id', $supplierId)->exists()) {
-                continue;
-            }
+            // Pakai inquiry yang sudah ada untuk supplier ini (jika ada), bukan skip total —
+            // supaya variasi baru yang baru terdaftar ke supplier ini (setelah inquiry pertama
+            // dibuat) tetap kebagian item, bukannya hilang begitu saja dari daftar konfirmasi.
+            $inquiry = SupplierInquiry::firstOrCreate(
+                ['needlist_id' => $needlist_id, 'supplier_id' => $supplierId],
+                ['status' => 'waiting_response']
+            );
 
-            $inquiry = SupplierInquiry::create([
-                'needlist_id' => $needlist_id,
-                'supplier_id' => $supplierId,
-                'status'      => 'waiting_response',
-            ]);
+            $existingVariasiIds = $inquiry->items()->pluck('id_variasi')->all();
 
             foreach ($svVariasiIds as $idVariasi) {
-                // Hanya buat item jika variasi ada di needlist aktif
+                // Hanya buat item jika variasi ada di needlist aktif dan belum punya item
                 if (!isset($variasiQtyMap[$idVariasi])) continue;
+                if (in_array($idVariasi, $existingVariasiIds)) continue;
 
                 SupplierInquiryItem::create([
                     'inquiry_id' => $inquiry->id,

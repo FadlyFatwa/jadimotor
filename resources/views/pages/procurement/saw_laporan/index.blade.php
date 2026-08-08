@@ -276,10 +276,11 @@ $(document).ready(function () {
             details.forEach(function(d) {
                 html += '<tr class="' + (d.ranking===1 ? 'table-success font-weight-bold' : '') + '">';
                 html += '<td class="text-left">' + d.supplier + (d.ranking===1 ? ' 🏆' : '') + '</td>';
-                ['c1','c2','c3','c4','c5','c6'].forEach(function(k) {
-                    html += '<td><div>Xij: ' + parseFloat(d['nilai_'+k]).toFixed(2) + '</div>';
-                    html += '<div class="text-muted" style="font-size:.8rem">Rij: ' + parseFloat(d['norm_'+k]).toFixed(4) + '</div>';
-                    html += '<div class="text-primary" style="font-size:.8rem">W×R: ' + parseFloat(d['weighted_'+k]).toFixed(4) + '</div></td>';
+                bobot.forEach(function(k) {
+                    var r = (d.rincian_kriteria && d.rincian_kriteria[k.kode]) || {nilai: 0, norm: 0, weighted: 0};
+                    html += '<td><div>Xij: ' + parseFloat(r.nilai).toFixed(2) + '</div>';
+                    html += '<div class="text-muted" style="font-size:.8rem">Rij: ' + parseFloat(r.norm).toFixed(4) + '</div>';
+                    html += '<div class="text-primary" style="font-size:.8rem">W×R: ' + parseFloat(r.weighted).toFixed(4) + '</div></td>';
                 });
                 html += '<td><strong>' + parseFloat(d.nilai_vi).toFixed(4) + '</strong></td>';
                 html += '<td><span class="badge badge-' + (d.ranking===1?'success':'secondary') + '">#' + d.ranking + '</span></td></tr>';

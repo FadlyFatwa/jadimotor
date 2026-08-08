@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\SawKriteria;
 use App\Models\SawNilaiHistoris;
 use Carbon\Carbon;
 
@@ -23,11 +24,15 @@ class SupplierLeadTimeResolver
     public function resolveDays(int $supplierId, ?string $estimasiPengiriman, ?Carbon $inquiryCreatedAt): array
     {
         $historis = SawNilaiHistoris::where('supplier_id', $supplierId)
+            ->with('details')
             ->orderByDesc('periode_akhir')
             ->first();
 
-        if ($historis && !is_null($historis->lead_time) && $historis->lead_time > 0) {
-            return ['days' => (float) $historis->lead_time, 'sumber' => 'historis'];
+        $c3Id = SawKriteria::where('kode', 'C3')->value('id');
+        $leadTime = $historis?->details->firstWhere('kriteria_id', $c3Id)?->nilai;
+
+        if ($historis && !is_null($leadTime) && $leadTime > 0) {
+            return ['days' => (float) $leadTime, 'sumber' => 'historis'];
         }
 
         if ($estimasiPengiriman && $inquiryCreatedAt) {

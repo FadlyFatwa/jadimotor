@@ -103,141 +103,81 @@
                     Nilai Kriteria SAW
                 </h6>
 
-                {{-- ── C2 + C3 ── --}}
+                {{-- ── Nilai per Kriteria (C2 dst — semua kecuali C1 yang dari Supplier Inquiry) ── --}}
+                @php
+                    $terminOptions = [
+                        1 => '1 — Cash / Bayar di Muka',
+                        2 => '2 — Tempo 14 Hari',
+                        3 => '3 — Tempo 30 Hari',
+                        4 => '4 — Tempo 60 Hari',
+                        5 => '5 — Tempo 90 Hari atau Lebih',
+                    ];
+                    $komOptions = [
+                        1 => '1 — Sangat Buruk',
+                        2 => '2 — Buruk',
+                        3 => '3 — Cukup',
+                        4 => '4 — Baik',
+                        5 => '5 — Sangat Baik',
+                    ];
+                    $hintByKode = [
+                        'C2' => 'Jangka waktu pembayaran yang diberikan supplier. Lebih panjang = lebih baik (benefit).',
+                        'C3' => 'Rata-rata hari dari pemesanan sampai barang tiba. Lebih kecil = lebih baik (cost).',
+                        'C4' => '% barang diterima sesuai qty yang dipesan. Lebih tinggi = lebih baik (benefit).',
+                        'C5' => '% order yang dipenuhi tepat waktu. Lebih tinggi = lebih baik (benefit).',
+                        'C6' => 'Responsivitas dan kejelasan komunikasi supplier. Lebih tinggi = lebih baik (benefit).',
+                    ];
+                @endphp
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>
-                                <span class="badge badge-primary mr-1">C2</span>
-                                Termin Pembayaran
-                            </label>
-                            <select name="termin_pembayaran"
-                                    class="form-control @error('termin_pembayaran') is-invalid @enderror">
-                                <option value="">-- Pilih --</option>
-                                @php
-                                    $terminOptions = [
-                                        1 => ['label' => '1 — Cash / Bayar di Muka',        'sub' => 'Pembayaran sebelum atau saat barang diterima'],
-                                        2 => ['label' => '2 — Tempo 14 Hari',                'sub' => 'Pembayaran paling lambat 14 hari setelah terima barang'],
-                                        3 => ['label' => '3 — Tempo 30 Hari',                'sub' => 'Pembayaran paling lambat 30 hari setelah terima barang'],
-                                        4 => ['label' => '4 — Tempo 60 Hari',                'sub' => 'Pembayaran paling lambat 60 hari setelah terima barang'],
-                                        5 => ['label' => '5 — Tempo 90 Hari atau Lebih',     'sub' => 'Pembayaran 90 hari ke atas / konsinyasi'],
-                                    ];
-                                    $oldTermin = old('termin_pembayaran', $historis->termin_pembayaran ?? '');
-                                @endphp
-                                @foreach($terminOptions as $val => $opt)
-                                    <option value="{{ $val }}" {{ $oldTermin == $val ? 'selected' : '' }}>
-                                        {{ $opt['label'] }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <small class="form-text text-muted">
-                                Jangka waktu pembayaran yang diberikan supplier. Lebih panjang = lebih baik (benefit).
-                            </small>
-                            @error('termin_pembayaran')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>
-                                <span class="badge badge-primary mr-1">C3</span>
-                                Lead Time (Hari)
-                            </label>
-                            <input type="text" inputmode="decimal" name="lead_time"
-                                   value="{{ old('lead_time', $historis->lead_time ?? '') }}"
-                                   class="form-control @error('lead_time') is-invalid @enderror"
-                                   placeholder="contoh: 7 atau 2,5"
-                                   oninput="this.value = this.value.replace(',', '.')">
-                            <small class="form-text text-muted">
-                                Rata-rata hari dari pemesanan sampai barang tiba. Lebih kecil = lebih baik (cost).
-                            </small>
-                            @error('lead_time')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-                </div>
+                    @foreach($kriteriaDinamis as $k)
+                        @php
+                            $fieldName = "nilai_kriteria.{$k->id}";
+                            $oldVal = old($fieldName, ($nilaiDinamis ?? collect())[$k->id]->nilai ?? '');
+                            $hint = $hintByKode[$k->kode] ?? ($k->jenis === 'benefit'
+                                ? 'Lebih tinggi = lebih baik (benefit).'
+                                : 'Lebih kecil = lebih baik (cost).');
+                        @endphp
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>
+                                    <span class="badge badge-primary mr-1">{{ $k->kode }}</span>
+                                    {{ $k->nama }}
+                                    @if($k->satuan)
+                                        <small class="text-muted">({{ $k->satuan }})</small>
+                                    @endif
+                                </label>
 
-                {{-- ── C4 + C5 ── --}}
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>
-                                <span class="badge badge-primary mr-1">C4</span>
-                                Akurasi Kuantitas
-                                <small class="text-muted">(%)</small>
-                            </label>
-                            <input type="text" inputmode="decimal" name="akurasi_kuantitas"
-                                   value="{{ old('akurasi_kuantitas', $historis->akurasi_kuantitas ?? '') }}"
-                                   class="form-control @error('akurasi_kuantitas') is-invalid @enderror"
-                                   placeholder="contoh: 95,5"
-                                   oninput="this.value = this.value.replace(',', '.')">
-                            <small class="form-text text-muted">
-                                % barang diterima sesuai qty yang dipesan. Lebih tinggi = lebih baik (benefit).
-                            </small>
-                            @error('akurasi_kuantitas')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>
-                                <span class="badge badge-primary mr-1">C5</span>
-                                Tingkat Pemenuhan
-                                <small class="text-muted">(%)</small>
-                            </label>
-                            <input type="text" inputmode="decimal" name="tingkat_pemenuhan"
-                                   value="{{ old('tingkat_pemenuhan', $historis->tingkat_pemenuhan ?? '') }}"
-                                   class="form-control @error('tingkat_pemenuhan') is-invalid @enderror"
-                                   placeholder="contoh: 88"
-                                   oninput="this.value = this.value.replace(',', '.')">
-                            <small class="form-text text-muted">
-                                % order yang dipenuhi tepat waktu. Lebih tinggi = lebih baik (benefit).
-                            </small>
-                            @error('tingkat_pemenuhan')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-                </div>
+                                @if($k->kode === 'C2')
+                                    <select name="nilai_kriteria[{{ $k->id }}]"
+                                            class="form-control @error($fieldName) is-invalid @enderror">
+                                        <option value="">-- Pilih --</option>
+                                        @foreach($terminOptions as $val => $label)
+                                            <option value="{{ $val }}" {{ $oldVal == $val ? 'selected' : '' }}>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                @elseif($k->kode === 'C6')
+                                    <select name="nilai_kriteria[{{ $k->id }}]"
+                                            class="form-control @error($fieldName) is-invalid @enderror">
+                                        <option value="">-- Pilih --</option>
+                                        @foreach($komOptions as $val => $label)
+                                            <option value="{{ $val }}" {{ $oldVal == $val ? 'selected' : '' }}>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                @else
+                                    <input type="text" inputmode="decimal"
+                                           name="nilai_kriteria[{{ $k->id }}]"
+                                           value="{{ $oldVal }}"
+                                           class="form-control @error($fieldName) is-invalid @enderror"
+                                           placeholder="contoh: 4"
+                                           oninput="this.value = this.value.replace(',', '.')">
+                                @endif
 
-                {{-- ── C6 ── --}}
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>
-                                <span class="badge badge-primary mr-1">C6</span>
-                                Komunikasi
-                            </label>
-                            <select name="komunikasi"
-                                    class="form-control @error('komunikasi') is-invalid @enderror">
-                                <option value="">-- Pilih --</option>
-                                @php
-                                    $komOptions = [
-                                        1 => ['label' => '1 — Sangat Buruk',    'sub' => 'Sangat sulit dihubungi, tidak responsif, informasi tidak jelas'],
-                                        2 => ['label' => '2 — Buruk',           'sub' => 'Sering lambat merespons, kadang informasi tidak akurat'],
-                                        3 => ['label' => '3 — Cukup',           'sub' => 'Merespons dalam waktu wajar, informasi cukup jelas'],
-                                        4 => ['label' => '4 — Baik',            'sub' => 'Responsif dan informatif, jarang ada miskomunikasi'],
-                                        5 => ['label' => '5 — Sangat Baik',     'sub' => 'Sangat responsif, proaktif memberikan update, tidak ada miskomunikasi'],
-                                    ];
-                                    $oldKom = old('komunikasi', $historis->komunikasi ?? '');
-                                @endphp
-                                @foreach($komOptions as $val => $opt)
-                                    <option value="{{ $val }}" {{ $oldKom == $val ? 'selected' : '' }}>
-                                        {{ $opt['label'] }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <small class="form-text text-muted">
-                                Responsivitas dan kejelasan komunikasi supplier. Lebih tinggi = lebih baik (benefit).
-                            </small>
-                            @error('komunikasi')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                                <small class="form-text text-muted">{{ $hint }}</small>
+                                @error($fieldName)
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
                         </div>
-                    </div>
+                    @endforeach
                 </div>
 
                 {{-- ── Panduan Skala ── --}}

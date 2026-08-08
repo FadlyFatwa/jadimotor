@@ -24,10 +24,40 @@ class SupplierRecommendationController extends Controller
      */
     public function index()
     {
-        $needlists = Needlist::with('user')
+        $needlists = Needlist::with([
+            'user',
+            'details',
+            'supplierInquiries.supplier',
+            'supplierInquiries.items.variasi.m_barang',
+            'supplierInquiries.items.variasi.vehicleGenerations.vehicle',
+        ])
             ->where('status', 'selection_in_progress')
             ->latest()
             ->get();
+
+        // Progres pemilihan per needlist, dihitung per KELOMPOK (bukan per variasi)
+        // — pengelompokan sama persis dengan yang dipakai show(), supaya konsisten.
+        // Alasan tidak bisa per-variasi: dalam satu kelompok, beberapa variasi bisa
+        // jadi alternatif yang saling bersaing (mis. dua supplier menawarkan variasi
+        // berbeda untuk kebutuhan yang sama) — cuma SATU yang akan dipilih, sisanya
+        // memang wajar tetap 'pending' selamanya. Menghitung per variasi salah
+        // mengira alternatif yang kalah itu "belum dipilih".
+        $needlists->each(function (Needlist $needlist) {
+            $referenceVariasiIds = $needlist->details->where('is_reference', true)->pluck('id_variasi')->toArray();
+
+            $groupedItems = $needlist->supplierInquiries
+                ->flatMap(fn ($inq) => $inq->items->map(fn ($item) => [
+                    'supplier' => $inq->supplier,
+                    'inquiry'  => $inq,
+                    'item'     => $item,
+                    'master'   => $item->variasi->m_barang,
+                ]))
+                ->groupBy(fn ($x) => $x['master']->id_barang);
+
+            $groups = $this->grouper->buildGroups($groupedItems, $referenceVariasiIds);
+
+            $needlist->pemilihanStatus = $this->statusPemilihanDariGroups($groups);
+        });
 
         return view('pages.procurement.pemilihan_supplier.index', compact('needlists'));
     }
@@ -100,18 +130,22 @@ class SupplierRecommendationController extends Controller
 
         $groups = $this->grouper->buildGroups($groupedItems, $referenceVariasiIds);
 
-        // Kelompok yang sudah pernah dihitung sebelumnya — dilewati supaya
-        // tidak dihitung ulang tiap kali halaman dibuka (hanya "Hitung Ulang"
-        // manual yang memaksa hitung ulang semua).
-        $alreadyComputedTierKeys = SawPerhitungan::where('needlist_id', $needlist->id)
-            ->whereNotNull('tier_key')
-            ->pluck('tier_key')
-            ->all();
+        // Sudah "Sudah Dipilih" lengkap SEBELUM kunjungan ini (state di DB saat
+        // halaman dibuka) — dipakai buat peringatkan user kalau mau menimpa
+        // pilihan yang sebelumnya sudah final, bukan buat menahan aksinya.
+        $sudahDipilihLengkap = $this->statusPemilihanDariGroups($groups) === 'sudah_dipilih';
 
-        // Otomatis hitung kelompok yang BELUM PERNAH dihitung sama sekali, supaya
-        // tombol "Pilih" tidak terkunci menunggu user klik tombol rekomendasi
-        // dahulu — sesuai alur: begitu syarat >1 supplier terpenuhi, sistem yang
-        // menjalankan rekomendasi, bukan menunggu permintaan eksplisit dari user.
+        // Kelompok yang AMAN dilewati (tidak dihitung ulang): sudah dikonfirmasi
+        // user (UC-04, terkunci permanen), ATAU belum dikonfirmasi tapi datanya
+        // (harga/estimasi penawaran, nilai kinerja supplier, bobot kriteria) belum
+        // berubah sejak kalkulasi terakhir. Tidak ada lagi tombol "Hitung Ulang"
+        // manual — sistem yang menentukan sendiri kapan perlu hitung ulang.
+        $alreadyComputedTierKeys = $this->batchCalculator->determineSkipTierKeys($needlist);
+
+        // Otomatis hitung kelompok yang belum pernah dihitung ATAU datanya sudah
+        // berubah, supaya tombol "Pilih" tidak terkunci menunggu aksi manual —
+        // sesuai alur: begitu syarat >1 supplier terpenuhi, sistem yang menjalankan
+        // rekomendasi, bukan menunggu permintaan eksplisit dari user.
         // Tidak dijalankan kalau PO sudah terbit — tidak ada lagi yang perlu dihitung.
         //
         // Kelompok yang berujung 'auto_assigned' (exclude menyisakan 1 kandidat)
@@ -153,7 +187,32 @@ class SupplierRecommendationController extends Controller
             'leadTimeResolver',
             'sawError',
             'autoAssignedByTierKey',
-            'supplierIdsWithHistoris'
+            'supplierIdsWithHistoris',
+            'sudahDipilihLengkap'
         ));
+    }
+
+    /**
+     * Status progres pemilihan dari kumpulan kelompok (dipakai index() untuk
+     * badge per needlist, dan show() untuk deteksi "sudah final sebelumnya").
+     * Dihitung per KELOMPOK (bukan per variasi) — dalam satu kelompok bisa ada
+     * beberapa variasi yang jadi alternatif saling bersaing, cuma satu yang akan
+     * terpilih, sisanya wajar tetap 'pending' selamanya.
+     */
+    private function statusPemilihanDariGroups(array $groups): string
+    {
+        $groupsNeedingSelection = collect($groups)->filter(fn ($g) => $g['unique_supplier_count'] >= 1);
+
+        $totalGroups    = $groupsNeedingSelection->count();
+        $selectedGroups = $groupsNeedingSelection->filter(
+            fn ($g) => $g['rows']->contains(fn ($r) => $r['item']->status === 'selected')
+        )->count();
+
+        return match (true) {
+            $totalGroups === 0             => 'belum_konfirmasi',
+            $selectedGroups === 0          => 'belum_dipilih',
+            $selectedGroups < $totalGroups => 'sebagian_dipilih',
+            default                        => 'sudah_dipilih',
+        };
     }
 }

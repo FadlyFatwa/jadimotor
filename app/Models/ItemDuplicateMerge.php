@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ItemDuplicateMerge extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'target_id_variasi',
         'target_barcode',

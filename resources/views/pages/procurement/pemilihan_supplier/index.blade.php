@@ -20,11 +20,11 @@
     <div class="card shadow-sm">
         <div class="card-body px-4 pt-3">
             @php
-                $statusBadge = [
-                    'inquiry_created'       => ['primary', 'Konfirmasi Harga Dibuat'],
-                    'selection_in_progress' => ['info',    'Pemilihan Supplier'],
-                    'po_issued'             => ['dark',    'Surat Pesanan Diterbitkan'],
-                    'completed'             => ['success', 'Selesai'],
+                $pemilihanBadge = [
+                    'belum_konfirmasi' => ['secondary', 'Belum Ada Konfirmasi'],
+                    'belum_dipilih'    => ['warning',   'Belum Dipilih'],
+                    'sebagian_dipilih' => ['info',      'Sebagian Dipilih'],
+                    'sudah_dipilih'    => ['success',   'Sudah Dipilih'],
                 ];
             @endphp
             <div class="table-responsive">
@@ -41,7 +41,7 @@
                     </thead>
                     <tbody>
                         @forelse($needlists as $i => $needlist)
-                            @php $badge = $statusBadge[$needlist->status] ?? ['secondary', $needlist->status]; @endphp
+                            @php $badge = $pemilihanBadge[$needlist->pemilihanStatus] ?? ['secondary', $needlist->pemilihanStatus]; @endphp
                             <tr>
                                 <td class="px-3">{{ $i + 1 }}</td>
                                 <td>{{ $needlist->kode_needlist }}</td>

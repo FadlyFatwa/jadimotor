@@ -2,14 +2,16 @@
 
 > Dokumen referensi untuk skripsi. Scope FINAL (disepakati bersama dosen pembimbing): **Sistem Pemilihan Supplier menggunakan metode SAW**, berdiri sendiri secara narasi, mencakup UC-01 (Kelola Kriteria & Bobot), UC-02 (Kelola Kinerja Supplier), UC-03 (Pemilihan Supplier — auto-run), UC-04 (Konfirmasi Supplier Terpilih). Login & master data = prasyarat/given.
 >
-> Struktur dokumen ini dipecah jadi 2 bagian: **(A)** 10 tabel yang masuk Class Diagram Bab 4 — detail lengkap (migration + model + kelas terkait). **(B)** tabel pendukung yang dipakai secara teknis tapi TIDAK digambar di Class Diagram — ringkas saja, untuk pemahaman alur data.
+> Struktur dokumen ini dipecah jadi 2 bagian: **(A)** 11 tabel yang masuk Class Diagram Bab 4 — detail lengkap (migration + model + kelas terkait). **(B)** tabel pendukung yang dipakai secara teknis tapi TIDAK digambar di Class Diagram — ringkas saja, untuk pemahaman alur data.
 >
-> Status per 2026-07-26: **4 perubahan yang disepakati sudah dieksekusi** (drop kolom, fix bug `sumber_c3`, rename+pindah 4 controller ke `App\Http\Controllers\SupplierSelection`) — lihat Rekap Perubahan di bagian akhir. Masih ada 1 hal yang sedang didiskusikan (penghapusan total fitur "Hitung Ulang"), belum dieksekusi.
+> Status per 2026-07-26: **4 perubahan yang disepakati sudah dieksekusi** (drop kolom, fix bug `sumber_c3`, rename+pindah 4 controller ke `App\Http\Controllers\SupplierSelection`). Masih ada 1 hal yang sedang didiskusikan (penghapusan total fitur "Hitung Ulang"), belum dieksekusi.
+>
+> Status per 2026-08-05: **skema dirombak jadi dinamis per-kriteria** — tabel baru `saw_nilai_historis_detail` (jadi tabel ke-11 di Class Diagram, keputusan sadar karena sekarang punya relasi nyata ke `saw_nilai_historis` & `saw_kriteria`) menampung SEMUA nilai kriteria C2 dst (bukan cuma kriteria custom); 8 kolom fixed lama di `saw_nilai_historis` sudah di-drop (data lama sudah dimigrasikan, bukan hilang). `saw_perhitungan_detail` juga dirombak dari 18 kolom `nilai_c1..weighted_c6` jadi satu kolom JSON `rincian_kriteria`, mengikuti pola `bobot_snapshot` yang sudah ada. Fitur "Normalisasi Otomatis" bobot kriteria (`SawKriteriaController::normalize()`) **dihapus total** atas permintaan user (method, route, tombol, test — bukan cuma dikecualikan dari diagram). Lihat Rekap Perubahan di bagian akhir untuk daftar lengkap.
 
 ---
 
 ## Daftar Isi
-1. [Bagian A — Tabel yang Masuk Class Diagram (10 tabel final)](#bagian-a)
+1. [Bagian A — Tabel yang Masuk Class Diagram (11 tabel final)](#bagian-a)
 2. [Bagian B — Tabel Pendukung (di luar scope Class Diagram)](#bagian-b)
 3. [Controller & View per Use Case](#controller-view)
 4. [Rekap Perubahan yang Sudah Dieksekusi](#rekap-pending)
@@ -18,7 +20,7 @@
 ---
 
 <a id="bagian-a"></a>
-## Bagian A — Tabel yang Masuk Class Diagram (10 tabel final)
+## Bagian A — Tabel yang Masuk Class Diagram (11 tabel final)
 
 ### `needlists`
 
@@ -284,11 +286,11 @@ Schema::create('saw_nilai_historis', function (Blueprint $table) {
     $table->date('periode_mulai');
     $table->date('periode_akhir');
     $table->decimal('total_biaya', 15, 2)->nullable();      // ✅ sudah di-drop, lihat migration 2026_07_25_000001
-    $table->decimal('termin_pembayaran', 5, 2)->nullable();
-    $table->decimal('lead_time', 5, 2)->nullable();
-    $table->decimal('akurasi_kuantitas', 5, 2)->nullable();
-    $table->decimal('tingkat_pemenuhan', 5, 2)->nullable();
-    $table->decimal('komunikasi', 3, 1)->nullable();
+    $table->decimal('termin_pembayaran', 5, 2)->nullable(); // ✅ sudah di-drop, lihat migration 2026_08_05_100200
+    $table->decimal('lead_time', 5, 2)->nullable();         // ✅ sudah di-drop
+    $table->decimal('akurasi_kuantitas', 5, 2)->nullable(); // ✅ sudah di-drop
+    $table->decimal('tingkat_pemenuhan', 5, 2)->nullable(); // ✅ sudah di-drop
+    $table->decimal('komunikasi', 3, 1)->nullable();        // ✅ sudah di-drop
     $table->integer('jumlah_transaksi')->default(0);
     $table->text('catatan')->nullable();
     $table->timestamps();
@@ -300,18 +302,11 @@ Schema::create('saw_nilai_historis', function (Blueprint $table) {
 
 **Alter** — `2026_04_28_030115_drop_id_variasi_from_saw_nilai_historis.php` — drop kolom + FK `id_variasi` (satu record historis per **supplier**, bukan per supplier+variasi).
 
-**Alter** — `2026_04_30_061440_add_manual_seed_to_saw_nilai_historis.php`
-```php
-$table->decimal('lead_time_manual', 5, 2)->nullable()->after('lead_time');
-$table->decimal('akurasi_kuantitas_manual', 5, 2)->nullable()->after('akurasi_kuantitas');
-$table->decimal('tingkat_pemenuhan_manual', 5, 2)->nullable()->after('tingkat_pemenuhan');
-$table->integer('jumlah_transaksi_manual')->default(0)->after('jumlah_transaksi');
-```
-*(kolom `*_manual` ini nyata ada di DB — dipakai seed untuk fitur sinkronisasi yang di luar scope skripsi. Tidak dimodelkan sebagai atribut Class Diagram, tapi tetap ada secara fisik di tabel)*
+**Alter** — `2026_04_30_061440_add_manual_seed_to_saw_nilai_historis.php` — tambah `lead_time_manual`, `akurasi_kuantitas_manual`, `tingkat_pemenuhan_manual`, `jumlah_transaksi_manual`. *(kolom `*_manual` untuk C3/C4/C5 ikut di-drop bersama kolom utamanya di migrasi 2026-08-05 di bawah — sudah tidak relevan setelah nilai kriteria dipindah ke tabel `saw_nilai_historis_detail` yang cuma punya satu kolom `nilai`, tanpa duality manual/aktual)*
 
-**Atribut final (DB):** `id`, `supplier_id` (FK), `periode_mulai`, `periode_akhir`, `termin_pembayaran`, `lead_time` + `lead_time_manual`, `akurasi_kuantitas` + `akurasi_kuantitas_manual`, `tingkat_pemenuhan` + `tingkat_pemenuhan_manual`, `komunikasi`, `jumlah_transaksi` + `jumlah_transaksi_manual`, `catatan`, timestamps. *(`total_biaya` sudah dihapus dari DB)*
+**Alter** — `2026_08_05_100200_migrate_kinerja_columns_to_saw_nilai_historis_detail.php` — **perombakan besar (2026-08-05)**: 8 kolom (`termin_pembayaran`, `lead_time`+`_manual`, `akurasi_kuantitas`+`_manual`, `tingkat_pemenuhan`+`_manual`, `komunikasi`) di-drop dari tabel ini. Isinya dimigrasikan (bukan dihapus) ke tabel baru `saw_nilai_historis_detail` — satu baris per (historis, kriteria). Alasan: kolom fixed per-kriteria tidak bisa mengikuti jumlah kriteria yang dinamis (waktu itu C7 "Garansi Produk" baru ditambah lewat UC-01 dan tidak ada tempat menyimpan nilainya). `jumlah_transaksi`/`jumlah_transaksi_manual` **tidak ikut pindah** — itu metadata jumlah transaksi (dipakai sebagai bobot di `SupplierPerformanceService`, bukan "nilai kriteria"), tetap kolom langsung di sini.
 
-**Atribut yang dimodelkan di Class Diagram (scope skripsi):** `id`, `supplier_id`, `periode_mulai`, `periode_akhir`, `termin_pembayaran` (C2), `lead_time` (C3), `akurasi_kuantitas` (C4), `tingkat_pemenuhan` (C5), `komunikasi` (C6), `jumlah_transaksi`, `catatan` — kolom `*_manual` tidak digambar.
+**Atribut final (DB):** `id`, `supplier_id` (FK), `periode_mulai`, `periode_akhir`, `jumlah_transaksi`, `jumlah_transaksi_manual`, `catatan`, timestamps. *(`total_biaya` dan 8 kolom nilai kriteria C2-C6 sudah dihapus dari DB — lihat tabel `saw_nilai_historis_detail` untuk nilai kriterianya sekarang)*
 
 **Model** — `app/Models/SawNilaiHistoris.php`
 ```php
@@ -320,19 +315,56 @@ class SawNilaiHistoris extends Model
     protected $table = 'saw_nilai_historis';
     protected $fillable = [
         'supplier_id', 'periode_mulai', 'periode_akhir',
-        'termin_pembayaran', 'lead_time', 'lead_time_manual',
-        'akurasi_kuantitas', 'akurasi_kuantitas_manual',
-        'tingkat_pemenuhan', 'tingkat_pemenuhan_manual',
-        'komunikasi', 'jumlah_transaksi', 'jumlah_transaksi_manual', 'catatan',
+        'jumlah_transaksi', 'jumlah_transaksi_manual', 'catatan',
     ];
     protected $casts = ['periode_mulai' => 'date', 'periode_akhir' => 'date'];
     public function supplier() { return $this->belongsTo(Supplier::class, 'supplier_id', 'id_supplier'); }
+    public function details() { return $this->hasMany(SawNilaiHistorisDetail::class, 'historis_id'); }
 }
 ```
 
 **Kelas terkait:**
-- `SawHistorisController` (UC-02) — CRUD manual. `store()`/`update()` mengisi kolom `*_manual` otomatis sama dengan nilai form (seed untuk fitur sinkronisasi yang tidak dibahas — tidak perlu dijelaskan di narasi kalau scope-nya manual-only).
-- `SawBatchCalculator::mergeWithHistoris()` — sumber **C2, C4, C5, C6**, dan fallback **C3** (dipakai kalau `lead_time > 0`, menggantikan lead time inquiry). Ini juga tempat Aturan Bisnis #4 diimplementasikan (exclude tanpa historis).
+- `SawHistorisController` (UC-02) — CRUD manual. `store()`/`update()` memvalidasi & menyimpan nilai tiap kriteria aktif (C2 dst) lewat `syncNilaiKriteria()` ke tabel `saw_nilai_historis_detail`, bukan lagi kolom langsung di tabel ini.
+- `SawBatchCalculator::mergeWithHistoris()` — baca semua kriteria aktif di luar C1 dari `->details` (relasi ke `saw_nilai_historis_detail`), termasuk fallback **C3** (dipakai kalau nilainya `> 0`, menggantikan lead time inquiry). Ini juga tempat Aturan Bisnis #4 diimplementasikan (exclude tanpa historis).
+
+---
+
+### `saw_nilai_historis_detail` *(tabel baru, 2026-08-05)*
+
+Tabel generik "nilai kriteria per historis" — menggantikan kolom fixed C2-C6 yang sebelumnya ada di `saw_nilai_historis`. Satu baris = satu nilai kriteria untuk satu record historis supplier. Dipakai untuk SEMUA kriteria di luar C1 (yang selalu dari `SupplierInquiry`, tidak pernah diinput manual) — baik C2-C6 (kriteria bawaan) maupun C7 dst (kriteria custom yang ditambah lewat UC-01).
+
+**Migration** — `2026_08_05_100000_create_saw_nilai_historis_detail_table.php` (dibuat untuk kriteria custom C7 dst, lalu diperluas cakupannya jadi semua C2-Cn oleh migrasi `2026_08_05_100200_migrate_kinerja_columns_to_saw_nilai_historis_detail.php` di atas)
+```php
+Schema::create('saw_nilai_historis_detail', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('historis_id')->constrained('saw_nilai_historis')->cascadeOnDelete();
+    $table->foreignId('kriteria_id')->constrained('saw_kriteria')->cascadeOnDelete();
+    $table->decimal('nilai', 15, 4);
+    $table->timestamps();
+    $table->unique(['historis_id', 'kriteria_id']);
+});
+```
+
+**Atribut final:** `id`, `historis_id` (FK → `saw_nilai_historis`, cascade delete), `kriteria_id` (FK → `saw_kriteria`, cascade delete), `nilai` decimal(15,4), timestamps. Unique `(historis_id, kriteria_id)` — satu kriteria cuma boleh punya satu nilai per record historis.
+
+**Kenapa cuma satu kolom `nilai` (tidak ada `nilai_manual`/seed terpisah):** desain awal sempat mempertimbangkan duality nilai-aktif vs nilai-seed-manual (mengikuti pola lama `lead_time`/`lead_time_manual`), tapi diputuskan disederhanakan jadi murni satu nilai manual — karena satu-satunya fitur yang butuh duality itu (`SupplierPerformanceService`, sinkronisasi otomatis dari transaksi PO) sudah dikonfirmasi **dead code** (tidak ada route yang memanggilnya). Method itu tetap disesuaikan supaya tidak error kalau suatu saat dipanggil, tapi sumber "seed"-nya sekarang dibaca dari `nilai` yang ada, bukan kolom terpisah.
+
+**Model** — `app/Models/SawNilaiHistorisDetail.php`
+```php
+class SawNilaiHistorisDetail extends Model
+{
+    protected $table = 'saw_nilai_historis_detail';
+    protected $fillable = ['historis_id', 'kriteria_id', 'nilai'];
+    public function historis() { return $this->belongsTo(SawNilaiHistoris::class, 'historis_id'); }
+    public function kriteria() { return $this->belongsTo(SawKriteria::class, 'kriteria_id'); }
+}
+```
+
+**Kelas terkait:**
+- `SawHistorisController` (UC-02) — `syncNilaiKriteria()` upsert/hapus baris di sini sesuai input form. Form render field dinamis per kriteria aktif (`kriteriaDinamisAktif()`), C2 & C6 tetap dropdown skala 1-5 (bukan angka bebas), sisanya input desimal.
+- `SawBatchCalculator::mergeWithHistoris()` — baca nilai tiap kriteria lewat relasi `SawNilaiHistoris::details` untuk dimasukkan ke matriks keputusan SAW.
+- `SupplierLeadTimeResolver` — baca nilai kriteria C3 dari sini untuk estimasi lead time di tabel Pemilihan Supplier.
+- `SawKriteriaController::destroy()` — cek keberadaan baris di tabel ini (per `kriteria_id`) sebagai syarat sebelum mengizinkan hapus kriteria custom secara permanen (kalau sudah ada data, hapus ditolak — arahkan ke nonaktifkan saja).
 
 ---
 
@@ -395,24 +427,9 @@ Schema::create('saw_perhitungan_detail', function (Blueprint $table) {
     $table->id();
     $table->unsignedBigInteger('perhitungan_id');
     $table->unsignedBigInteger('supplier_id');
-    $table->decimal('nilai_c1', 15, 6)->default(0);
-    $table->decimal('nilai_c2', 15, 6)->default(0);
-    $table->decimal('nilai_c3', 15, 6)->default(0);
-    $table->decimal('nilai_c4', 15, 6)->default(0);
-    $table->decimal('nilai_c5', 15, 6)->default(0);
-    $table->decimal('nilai_c6', 15, 6)->default(0);
-    $table->decimal('norm_c1', 10, 6)->default(0);
-    $table->decimal('norm_c2', 10, 6)->default(0);
-    $table->decimal('norm_c3', 10, 6)->default(0);
-    $table->decimal('norm_c4', 10, 6)->default(0);
-    $table->decimal('norm_c5', 10, 6)->default(0);
-    $table->decimal('norm_c6', 10, 6)->default(0);
-    $table->decimal('weighted_c1', 10, 6)->default(0);
-    $table->decimal('weighted_c2', 10, 6)->default(0);
-    $table->decimal('weighted_c3', 10, 6)->default(0);
-    $table->decimal('weighted_c4', 10, 6)->default(0);
-    $table->decimal('weighted_c5', 10, 6)->default(0);
-    $table->decimal('weighted_c6', 10, 6)->default(0);
+    $table->decimal('nilai_c1', 15, 6)->default(0);   // ✅ sudah di-drop, lihat migration 2026_08_05_100100
+    $table->decimal('nilai_c2', 15, 6)->default(0);   // ✅ sudah di-drop
+    // ... nilai_c3..c6, norm_c1..c6, weighted_c1..c6 — 18 kolom, semua sudah di-drop
     $table->decimal('nilai_vi', 10, 6)->default(0);
     $table->integer('ranking')->default(0);
     $table->tinyInteger('is_recommended')->default(0);
@@ -436,7 +453,9 @@ $table->foreign('id_variasi')->references('id_variasi')->on('variasis')->onDelet
 $table->boolean('has_historis')->default(false)->after('sumber_c3');
 ```
 
-**Atribut final:** `id`, `perhitungan_id` (FK), `supplier_id` (FK), `id_variasi` (FK nullable), `nilai_c1..c6`, `norm_c1..c6`, `weighted_c1..c6`, `nilai_vi`, `ranking`, `is_recommended`, `sumber_c1`, `sumber_c3`, `has_historis`, timestamps.
+**Alter** — `2026_08_05_100100_convert_saw_perhitungan_detail_to_dynamic.php` — **perombakan besar (2026-08-05)**: 18 kolom wide (`nilai_c1..c6`, `norm_c1..c6`, `weighted_c1..c6`) di-drop, diganti SATU kolom `rincian_kriteria` (json), berisi array per kode kriteria: `{kode: {nilai, norm, weighted}}`. Ini mengikuti pola yang **sudah ada** di `saw_perhitungan.bobot_snapshot` (json, `casts => array`) — bukan pendekatan baru, cuma diterapkan konsisten ke tabel saudaranya. Alasan: kolom wide per-kriteria berarti skema tabel harus diubah lagi setiap kali kriteria SAW berubah (tambah C7 dst), dan baris-baris lama jadi tidak bisa merepresentasikan kriteria yang berbeda dari saat itu. Kolom JSON per-baris adalah snapshot literal (bukan referensi hidup ke `saw_kriteria`), jadi laporan lama tidak pernah rusak walau kriteria yang dipakai saat itu belakangan dihapus/diubah.
+
+**Atribut final:** `id`, `perhitungan_id` (FK), `supplier_id` (FK), `id_variasi` (FK nullable), `rincian_kriteria` json, `nilai_vi`, `ranking`, `is_recommended`, `sumber_c1`, `sumber_c3`, `has_historis`, timestamps. *(`sumber_c1`/`sumber_c3` tetap kolom terpisah — cuma C1 & C3 yang punya semantik sumber inquiry-vs-historis, jadi tidak digeneralisasi ke kolom lain)*
 
 **Model** — `app/Models/SawPerhitunganDetail.php`
 ```php
@@ -445,18 +464,25 @@ class SawPerhitunganDetail extends Model
     protected $table = 'saw_perhitungan_detail';
     protected $fillable = [
         'perhitungan_id', 'supplier_id', 'id_variasi',
-        'nilai_c1', 'nilai_c2', 'nilai_c3', 'nilai_c4', 'nilai_c5', 'nilai_c6',
-        'norm_c1', 'norm_c2', 'norm_c3', 'norm_c4', 'norm_c5', 'norm_c6',
-        'weighted_c1', 'weighted_c2', 'weighted_c3', 'weighted_c4', 'weighted_c5', 'weighted_c6',
+        'rincian_kriteria', // ['C1' => ['nilai'=>x,'norm'=>x,'weighted'=>x], 'C2' => [...], ...]
         'nilai_vi', 'ranking', 'is_recommended', 'sumber_c1', 'sumber_c3', 'has_historis',
+    ];
+    protected $casts = [
+        'rincian_kriteria' => 'array',
+        'is_recommended' => 'boolean',
+        'has_historis' => 'boolean',
     ];
     public function perhitungan() { return $this->belongsTo(SawPerhitungan::class, 'perhitungan_id'); }
     public function supplier() { return $this->belongsTo(Supplier::class, 'supplier_id', 'id_supplier'); }
     public function variasi() { return $this->belongsTo(Variasi::class, 'id_variasi', 'id_variasi'); }
+
+    public function nilai(string $kode): float    { return (float) ($this->rincian_kriteria[$kode]['nilai'] ?? 0); }
+    public function norm(string $kode): float      { return (float) ($this->rincian_kriteria[$kode]['norm'] ?? 0); }
+    public function weighted(string $kode): float  { return (float) ($this->rincian_kriteria[$kode]['weighted'] ?? 0); }
 }
 ```
 
-**Kelas terkait:** `SawService` — seluruh method kalkulasi (`buildMatrix/normalize/weightedSum/rank`) menulis ke sini via `saveToDatabase()`. Hasil rekomendasi (`ranking=1`/`is_recommended=1`) tampil di `SupplierRecommendationController::show()`.
+**Kelas terkait:** `SawService` — seluruh method kalkulasi (`buildMatrix/normalize/weightedSum/rank`) menulis ke sini via `saveToDatabase()` (loop generik per kriteria aktif, bukan hardcode C1-C6 lagi). Hasil rekomendasi (`ranking=1`/`is_recommended=1`) tampil di `SupplierRecommendationController::show()`. `SupplierSelectionSawController::detailSaw()` & view `saw_laporan/index.blade.php` (modal breakdown) baca `rincian_kriteria` untuk render tabel Xij/Rij/W×R per kriteria, otomatis mengikuti berapa pun jumlah kriteria aktif.
 
 > ✅ **Bug sudah diperbaiki:** `SawBatchCalculator::mergeWithHistoris()` sekarang set `$row['_sumber_c3'] = 'historis';` saat nilai C3 diganti dari data historis, jadi label `sumber_c3` konsisten dengan sumber nilainya.
 
@@ -552,13 +578,23 @@ Tabel-tabel ini **dipakai secara teknis** oleh alur SAW (terutama sumber data C1
 **Route:** `procurement/saw-kriteria/*` → `saw.kriteria.*`
 **View:** `saw_kriteria/index.blade.php`, `saw_kriteria/form.blade.php`
 
+Catatan (2026-08-05): fitur "Normalisasi Otomatis" (dulu `+normalize(): RedirectResponse`, route `saw.kriteria.normalize`, tombol di halaman index) **dihapus total** atas permintaan user — bukan cuma dikecualikan dari diagram. Total bobot kriteria aktif tetap ditampilkan (banner hijau/kuning), tapi penyesuaian ke 100% sekarang manual lewat form edit tiap kriteria.
+
+`destroy()` sekarang punya pengaman: kriteria inti (C1-C6) tidak bisa dihapus sama sekali (kode-nya dipakai langsung sebagai sumber data spesifik di `SawBatchCalculator`); kriteria custom (C7 dst) tidak bisa dihapus kalau sudah ada baris di `saw_nilai_historis_detail` untuk kriteria itu. Kedua kasus diarahkan untuk nonaktifkan (`is_active=0`) saja — reversibel, tidak menyentuh riwayat.
+
 ### UC-02 — Kelola Kinerja Supplier (`SawHistorisController`)
 **Route:** `procurement/saw-historis/*` → `saw.historis.*`
 **View:** `saw_historis/index.blade.php`, `saw_historis/form.blade.php`
 
+Catatan (2026-08-05): form sekarang render field secara **dinamis** mengikuti kriteria aktif (`kriteriaDinamisAktif()` = semua kriteria aktif di luar C1), bukan lagi 5 field hardcode C2-C6. C2 & C6 tetap dropdown skala 1-5 (label termin/komunikasi persis seperti sebelumnya), kriteria lain (C3, C4, C5, C7 dst) input desimal generik. Kalau ada kriteria baru ditambah lewat UC-01, field-nya otomatis muncul di form ini tanpa perlu ubah kode lagi.
+
 ### UC-03 — Pemilihan Supplier (`SupplierRecommendationController`)
-**Route:** `procurement/pemilihan-supplier/*` → `pemilihan-supplier.*` (`index`, `ringkasan`, `show`)
+**Route:** `procurement/pemilihan-supplier/*` → `pemilihan-supplier.*` (`index`, `ringkasan`, `show`) — route `rekomendasi-semua` (tombol "Hitung Ulang" manual) sudah dihapus
 **View:** `pemilihan_supplier/index.blade.php`, `ringkasan.blade.php`, `show.blade.php`
+
+Catatan (2026-08-05): tidak ada lagi tombol manual untuk memicu hitung ulang. `show()` selalu auto-hitung lewat `SawBatchCalculator::determineSkipTierKeys()` + `calculateForNeedlist()` — kelompok yang sudah dikonfirmasi (UC-04) terkunci permanen, kelompok yang belum dikonfirmasi dihitung ulang otomatis kalau ada perubahan harga/kinerja supplier/bobot kriteria sejak kalkulasi terakhir. Ini tetap satu use case yang sama (bukan use case baru) — tidak ada aksi aktor yang berubah, cuma detail implementasi "otomatis" yang diperjelas.
+
+Catatan tambahan (2026-08-05): `index()` sekarang menampilkan badge progres pemilihan per needlist (`statusPemilihanDariGroups()`) — "Belum Ada Konfirmasi" / "Belum Dipilih" / "Sebagian Dipilih" / "Sudah Dipilih", dihitung per KELOMPOK (bukan per variasi, karena satu kelompok bisa punya beberapa variasi yang saling bersaing — cuma satu yang dipilih, sisanya wajar tetap `pending`). `show()` juga memakai status yang sama untuk menampilkan peringatan konfirmasi (bukan blokir) kalau user mau mengubah needlist yang sudah "Sudah Dipilih" — sesuai Aturan Bisnis #5, keputusan tetap fleksibel sampai PO terbit.
 
 ### UC-04 — Konfirmasi Supplier Terpilih (`SupplierConfirmationController`)
 **Route:** `POST /needlist/{needlist}/save/selection` → `supplier.selection.save`
@@ -580,7 +616,31 @@ Migration baru dibuat dengan guard `Schema::hasColumn()` supaya aman dijalankan 
 
 **Keputusan lain yang dibahas tapi tidak dieksekusi:** sempat dipertimbangkan untuk melepas prefix "Saw" dari 5 model (`SawKriteria`, `SawNilaiHistoris`, `SawPerhitungan`, `SawPerhitunganDetail`, `SawRekomendasi`) supaya konsisten dengan controller yang baru di-rename. Diputuskan **tidak** — beda masalah dari controller (yang direfactor karena isu struktural namespace), model sudah flat di `app/Models/` tanpa masalah itu, dan prefix "Saw" justru informatif. Blast radius rename model juga jauh lebih besar (semua service, controller lain, belasan view, seeder).
 
-⏳ **Sedang didiskusikan, belum dieksekusi:** menghapus total fitur "Hitung Ulang Rekomendasi" (`SupplierSelectionSawController::hitungSemua()`, route `pemilihan-supplier.rekomendasi-semua`, tombol di `pemilihan_supplier/show.blade.php`) supaya `SupplierRecommendationController::show()` selalu auto-hitung ulang setiap dibuka tanpa tombol manual — sesuai Aturan Bisnis #3. Terhambat isu teknis: recalculate tanpa syarat berisiko menghapus `SawRekomendasi` yang sudah dikonfirmasi lewat cascade delete (`saw_rekomendasi.perhitungan_id` `ON DELETE CASCADE` ke `saw_perhitungan`). Opsi yang diusulkan: skip kelompok yang sudah dikonfirmasi (cek `SawPerhitungan::whereHas('rekomendasi')`), bukan skip berdasar "sudah pernah dihitung" seperti sekarang.
+✅ **Sudah dieksekusi (2026-08-05):** fitur "Hitung Ulang Rekomendasi" dihapus total — `SupplierSelectionSawController::hitungSemua()`, route `pemilihan-supplier.rekomendasi-semua`, tombol & JS pendukung (`applyRekomendasi()`, `#btnRekomendasiSemua`) di `pemilihan_supplier/show.blade.php`/`_scripts.blade.php` semua dihapus. Sebagai gantinya, `SupplierRecommendationController::show()` sekarang selalu auto-hitung ulang lewat `SawBatchCalculator::determineSkipTierKeys()` — kelompok yang sudah dikonfirmasi (`SawPerhitungan::whereHas('rekomendasi')`) selalu dikunci, kelompok yang belum dikonfirmasi dihitung ulang otomatis HANYA kalau data sumbernya (harga penawaran, nilai kinerja supplier, bobot kriteria) berubah sejak kalkulasi terakhir — persis opsi yang diusulkan di catatan lama ini, plus tambahan dirty-check supaya tidak boros hitung ulang tanpa alasan. Tombol "Detail Needlist" di halaman yang sama juga dihapus atas permintaan user (simplifikasi UI, cuma sisa "Kembali ke Ringkasan").
+
+---
+
+## Rekap Perubahan yang Sudah Dieksekusi (2026-08-05)
+
+Latar belakang: user menambah kriteria ke-7 ("C7 — Garansi Produk") lewat UC-01, lalu menemukan form Kinerja Supplier (UC-02) belum bisa menampung nilainya karena masih hardcode C2-C6. Perbaikan ini meluas jadi perombakan skema, bukan cuma tambal field.
+
+| # | Tabel/Kelas | Perubahan | Status |
+|---|---|---|---|
+| 1 | `saw_nilai_historis_detail` | **Tabel baru** — penyimpanan generik nilai kriteria (historis_id, kriteria_id, nilai). Awalnya cuma untuk kriteria custom (C7 dst), migrasi kedua di hari yang sama memperluasnya menampung C2-C6 juga | ✅ Selesai — jadi tabel ke-11 di Class Diagram (keputusan sadar: sekarang punya relasi nyata ke `saw_nilai_historis` & `saw_kriteria`, bukan cuma pendukung teknis) |
+| 2 | `saw_nilai_historis` | 8 kolom fixed (`termin_pembayaran`, `lead_time`+`_manual`, `akurasi_kuantitas`+`_manual`, `tingkat_pemenuhan`+`_manual`, `komunikasi`) di-drop, datanya dimigrasikan ke `saw_nilai_historis_detail` (bukan hilang) | ✅ Selesai — migration `2026_08_05_100200_migrate_kinerja_columns_to_saw_nilai_historis_detail.php`, terverifikasi 14 record lama → 71 baris detail |
+| 3 | `saw_perhitungan_detail` | 18 kolom wide (`nilai_c1..c6`, `norm_c1..c6`, `weighted_c1..c6`) diganti 1 kolom JSON `rincian_kriteria`, mengikuti pola `bobot_snapshot` yang sudah ada di `saw_perhitungan` | ✅ Selesai — migration `2026_08_05_100100_convert_saw_perhitungan_detail_to_dynamic.php`. Konsekuensi: baris lama (sebelum migrasi) kehilangan breakdown per-kriteria (jadi 0), tapi `nilai_vi`/`ranking` tidak tersentuh — bisa dipulihkan dengan klik "Hitung Ulang" |
+| 4 | `SawBatchCalculator::mergeWithHistoris()` | Loop terpisah C2-C6 (kolom fixed) + kriteria custom disatukan jadi satu loop generik atas semua kriteria aktif di luar C1 | ✅ Selesai |
+| 5 | `SupplierPerformanceService::recalculate()` | Disesuaikan baca/tulis lewat `saw_nilai_historis_detail` (bukan kolom `*_manual` yang sudah dihapus) — method ini tetap **dead code**, tidak ada route yang memanggilnya | ✅ Selesai, cuma supaya tidak error kalau dipanggil |
+| 6 | `SawKriteriaController::destroy()` | Tambah pengaman: C1-C6 tidak bisa dihapus sama sekali; kriteria custom yang sudah punya data di `saw_nilai_historis_detail` juga tidak bisa dihapus. Diarahkan nonaktifkan saja | ✅ Selesai |
+| 7 | `SawKriteriaController::normalize()` | **Dihapus total** (method, route `saw.kriteria.normalize`, tombol "Normalisasi Otomatis" di index, test terkait) atas permintaan user — bukan cuma dikecualikan dari Class Diagram | ✅ Selesai |
+| 8 | `SupplierLeadTimeResolver::resolveDays()` | Baca lead time (C3) dari `saw_nilai_historis_detail`, bukan lagi `$historis->lead_time` | ✅ Selesai |
+| 9 | `pemilihan_supplier/show.blade.php` | Tombol "Hitung Ulang Rekomendasi" & "Detail Needlist" dihapus dari header halaman — tinggal "Kembali ke Ringkasan" | ✅ Selesai, atas permintaan user |
+| 10 | `SawBatchCalculator::determineSkipTierKeys()` | Method baru — pengganti tombol "Hitung Ulang" manual. Kelompok yang sudah dikonfirmasi selalu dikunci; kelompok yang belum dikonfirmasi dihitung ulang otomatis kalau harga penawaran, nilai kinerja supplier, atau bobot kriteria berubah sejak kalkulasi terakhir; kalau tidak ada perubahan, tetap di-skip (tidak boros) | ✅ Selesai — 6 test baru (`SawSkipTierKeysTest.php`) |
+| 11 | `SupplierSelectionSawController::hitungSemua()` | Dihapus total (method, route `pemilihan-supplier.rekomendasi-semua`, JS `applyRekomendasi()`/`#btnRekomendasiSemua`) — sudah jadi dead code sejak tombolnya dihapus, dan fungsinya sudah digantikan `determineSkipTierKeys()` | ✅ Selesai |
+| 12 | `SupplierRecommendationController::statusPemilihanDariGroups()` | Method baru — hitung progres pemilihan per needlist per KELOMPOK (bukan per variasi). Dipakai `index()` buat badge 4 status di `pemilihan_supplier/index.blade.php`, dan `show()` buat deteksi "sudah final" | ✅ Selesai — 3 test baru (2 di `SupplierRecommendationTest.php` termasuk regresi kelompok alternatif-bersaing) |
+| 13 | `show.blade.php` / `_scripts.blade.php` | Peringatan SweetAlert (bukan blokir) sebelum "Simpan Pilihan" kalau needlist sudah "Sudah Dipilih" lengkap sebelumnya — tetap bisa diedit sampai PO terbit, cuma tambah kesadaran sebelum menimpa | ✅ Selesai |
+
+Semua perubahan sudah lolos `php -l`, `php artisan migrate` (terverifikasi data lama pindah utuh), dan full test suite (249 lolos, 1 gagal — bug pre-existing di modul Sales/Penerimaan yang tidak terkait sama sekali).
 
 ---
 
@@ -590,16 +650,25 @@ Migration baru dibuat dengan guard `Schema::hasColumn()` supaya aman dijalankan 
 ```
 SupplierRecommendationController::show($id)                 [UC-03]
   ├─ NeedlistSelectionGrouper::buildGroups()            → pengelompokan
-  ├─ SawBatchCalculator::calculateForNeedlist()          → orkestrasi per kelompok (auto-run)
-  │    ├─ getInquiryDataByCluster()                      → baca supplier_inquiry_items (Bagian B)
-  │    ├─ mergeWithHistoris()                            → baca saw_nilai_historis, Aturan Bisnis #4
+  ├─ SawBatchCalculator::determineSkipTierKeys()          → kelompok mana yang AMAN dilewati:
+  │                                                          sudah dikonfirmasi (kunci permanen), ATAU belum
+  │                                                          dikonfirmasi tapi harga/kinerja/bobot belum berubah
+  ├─ SawBatchCalculator::calculateForNeedlist($needlist, $skipTierKeys)   → orkestrasi per kelompok (auto-run)
+  │    ├─ getInquiryDataByCluster()                      → baca supplier_inquiry_items (Bagian B), sumber C1
+  │    ├─ mergeWithHistoris()                            → baca saw_nilai_historis + ->details (generik
+  │    │                                                     semua kriteria aktif di luar C1), Aturan Bisnis #4
   │    └─ SawService::calculate()
-  │         ├─ buildMatrix() / normalize() / weightedSum() / rank()
+  │         ├─ buildMatrix() / normalize() / weightedSum() / rank()   (generik per kriteria, tidak hardcode C1-C6)
   │         └─ saveToDatabase()                          → tulis saw_perhitungan + saw_perhitungan_detail
-  └─ (tampil di pemilihan_supplier/show.blade.php)
+  │                                                          (rincian_kriteria json, bukan kolom c1-c6 lagi)
+  └─ (tampil di pemilihan_supplier/show.blade.php — tanpa tombol "Hitung Ulang" manual lagi)
 
 SupplierConfirmationController::saveSelection()            [UC-04]
   ├─ update SupplierInquiryItem::status = 'selected'     (Bagian B, penggerak proses lanjutan)
   └─ recordSawRekomendasi()
        └─ SawRekomendasi::updateOrCreate(...)            → log/audit, TIDAK mempengaruhi kalkulasi
+
+SawHistorisController::store()/update()                     [UC-02]
+  └─ syncNilaiKriteria()
+       └─ SawNilaiHistorisDetail::updateOrCreate(...)    → satu baris per kriteria aktif yang diisi di form
 ```

@@ -175,15 +175,15 @@ class PenjualanController extends Controller
             }
 
             $penjualan = Penjualan::create([
-                'invoice' => $request->invoice,
+                'nomor_nota' => $request->invoice,
                 'tanggal' => $request->tanggal,
                 'pelanggan_id' => $request->pelanggan_id,
                 'user_id' => Auth::id(),
                 'diskon' => $request->diskon ?? 0,
                 'metode_pembayaran' => $request->metode_pembayaran,
-                'cash_bayar' => $request->cash_bayar ?? 0,
-                'kembalian' => $request->kembalian ?? 0,
-                'total' => 0
+                'total' => 0,
+                'grand_total' => 0,
+                'status' => 'completed',
             ]);
 
             $total = 0;
@@ -199,7 +199,7 @@ class PenjualanController extends Controller
                 $total += $subtotal;
 
                 PenjualanDetail::create([
-                    'penjualan_id' => $penjualan->id,
+                    'id_penjualan' => $penjualan->id_penjualan,
                     'id_variasi' => $item->id_variasi,
                     'nama_barang_jual' => $item->nama_barang_jual,
                     'harga' => $item->harga,
@@ -211,12 +211,12 @@ class PenjualanController extends Controller
             }
 
             $grandTotal = $total - ($total * ($request->diskon ?? 0) / 100);
-            
+
             if ($request->metode_pembayaran == 'cash' && $request->cash_bayar < $grandTotal) {
                 throw new \Exception("Pembayaran cash kurang dari total yang harus dibayar");
             }
 
-            $penjualan->update(['total' => $grandTotal]);
+            $penjualan->update(['total' => $total, 'grand_total' => $grandTotal]);
 
             Cart::where('user_id', Auth::id())->delete();
 

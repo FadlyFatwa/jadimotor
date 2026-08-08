@@ -27,6 +27,13 @@ class Cart extends Model
         return $this->belongsTo(Variasi::class, 'id_variasi');
     }
 
+    // Alias for backward compatibility with views/controller code that
+    // reference $cart->barang (App\Models\Barang does not exist).
+    public function barang()
+    {
+        return $this->belongsTo(Variasi::class, 'id_variasi');
+    }
+
     // Accessor untuk barcode
     public function getBarcodeAttribute()
     {

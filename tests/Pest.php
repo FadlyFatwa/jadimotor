@@ -45,3 +45,21 @@ function something()
 {
     // ..
 }
+
+/**
+ * Seed nilai kriteria (by kode, mis. 'C2' => 3) ke saw_nilai_historis_detail
+ * untuk satu record SawNilaiHistoris — dipakai tes yang butuh data C2-C6/C7+
+ * tanpa mengulang lookup kriteria_id manual di tiap file.
+ */
+function seedHistorisNilai(\App\Models\SawNilaiHistoris $historis, array $nilaiByKode): void
+{
+    $ids = \App\Models\SawKriteria::whereIn('kode', array_keys($nilaiByKode))->pluck('id', 'kode');
+
+    foreach ($nilaiByKode as $kode => $nilai) {
+        \App\Models\SawNilaiHistorisDetail::create([
+            'historis_id' => $historis->id,
+            'kriteria_id' => $ids[$kode],
+            'nilai' => $nilai,
+        ]);
+    }
+}

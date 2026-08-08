@@ -15,12 +15,10 @@ class SawPerhitunganDetail extends Model
         'perhitungan_id',
         'supplier_id',
         'id_variasi',
-        // Nilai mentah
-        'nilai_c1', 'nilai_c2', 'nilai_c3', 'nilai_c4', 'nilai_c5', 'nilai_c6',
-        // Normalisasi
-        'norm_c1', 'norm_c2', 'norm_c3', 'norm_c4', 'norm_c5', 'norm_c6',
-        // Terbobot
-        'weighted_c1', 'weighted_c2', 'weighted_c3', 'weighted_c4', 'weighted_c5', 'weighted_c6',
+        // Snapshot dinamis: ['C1' => ['nilai'=>x,'norm'=>x,'weighted'=>x], 'C2' => [...], ...]
+        // — mengikuti pola bobot_snapshot di SawPerhitungan, supaya jumlah kriteria
+        // bisa berubah (tambah/hapus) tanpa perlu migrasi skema tabel lagi.
+        'rincian_kriteria',
         'nilai_vi',
         'ranking',
         'is_recommended',
@@ -28,6 +26,27 @@ class SawPerhitunganDetail extends Model
         'sumber_c3',
         'has_historis',
     ];
+
+    protected $casts = [
+        'rincian_kriteria' => 'array',
+        'is_recommended'   => 'boolean',
+        'has_historis'     => 'boolean',
+    ];
+
+    public function nilai(string $kode): float
+    {
+        return (float) ($this->rincian_kriteria[$kode]['nilai'] ?? 0);
+    }
+
+    public function norm(string $kode): float
+    {
+        return (float) ($this->rincian_kriteria[$kode]['norm'] ?? 0);
+    }
+
+    public function weighted(string $kode): float
+    {
+        return (float) ($this->rincian_kriteria[$kode]['weighted'] ?? 0);
+    }
 
     public function perhitungan()
     {

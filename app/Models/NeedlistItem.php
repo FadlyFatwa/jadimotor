@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class NeedlistItem extends Model
 {
+    use HasFactory;
+
     protected $fillable = ['needlist_id', 'id_variasi', 'qty', 'status', 'rejected_reason', 'keterangan', 'is_reference'];
 
     protected $casts = ['is_reference' => 'boolean', 'qty' => 'integer'];

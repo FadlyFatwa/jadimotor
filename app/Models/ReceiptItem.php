@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ReceiptItem extends Model
 {
+    use HasFactory;
+
     protected $fillable = ['receipt_id', 'purchase_order_item_id', 'id_variasi', 'qty_order', 'qty_received'];
 
     public function receipt()
