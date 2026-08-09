@@ -156,9 +156,8 @@ it('runs the full batch calculation for a needlist and ranks suppliers correctly
     $needlist = Needlist::factory()->create();
     $variasi = Variasi::factory()->create();
 
-    // Give the item a vehicle-generation compatibility so NeedlistSelectionGrouper
-    // clusters the two suppliers' quotes together (see report: items with zero
-    // vehicle-generation links never cluster, a separate bug noted below).
+    // Give the item a vehicle-generation compatibility, like a properly categorized
+    // master barang would have.
     $generation = VehicleGeneration::factory()->create();
     ProductVariantCompatibility::create([
         'id_variasi' => $variasi->id_variasi,
@@ -266,43 +265,59 @@ it('excludes suppliers without historis and auto-assigns when only one candidate
     expect(SawPerhitungan::where('needlist_id', $needlist->id)->count())->toBe(0);
 });
 
-it('never compares two suppliers quoting the same universal (no vehicle-generation) item', function () {
-    // Documents a real limitation in NeedlistSelectionGrouper::clusterByVehicleGeneration():
-    // it unions rows only when array_intersect() of their vehicle-generation ids is
-    // non-empty. Two rows that BOTH have zero vehicle-generation links produce
-    // array_intersect([], []) === [], which is falsy, so they are never merged into
-    // the same cluster/group even though they are literally the same SKU (same
-    // id_variasi) quoted by two different suppliers. Each ends up alone in its own
+it('compares two suppliers quoting the same universal (no vehicle-generation) item', function () {
+    // Regression test for a bug that used to live in
+    // NeedlistSelectionGrouper::clusterByVehicleGeneration(): it unioned rows only
+    // when array_intersect() of their vehicle-generation ids was non-empty. Two rows
+    // that BOTH have zero vehicle-generation links (e.g. an uncategorized master
+    // barang — the norm for most of the real catalog) produced
+    // array_intersect([], []) === [], which is falsy, so they were never merged into
+    // the same cluster/group even though they were literally the same SKU (same
+    // id_variasi) quoted by two different suppliers. Each ended up alone in its own
     // 1-row group, unique_supplier_count === 1, and SawBatchCalculator silently
-    // skips it (no SAW calculation, no auto-assignment at all).
-    // Out of this test's edit scope (lives in NeedlistSelectionGrouper, not
-    // SawService/SawBatchCalculator) — reported as a bug, not fixed here.
+    // skipped it (no SAW calculation, no auto-assignment at all).
+    // Fixed by also unioning rows that share the same id_variasi, regardless of
+    // vehicle-generation data — two rows quoting the identical SKU must always be
+    // compared together.
     ($this->seedFullSawKriteria)();
 
     $needlist = Needlist::factory()->create();
     $variasi = Variasi::factory()->create(); // no ProductVariantCompatibility at all
 
-    $supplierA = Supplier::factory()->create();
-    $supplierB = Supplier::factory()->create();
-    SawNilaiHistoris::factory()->create(['supplier_id' => $supplierA->id_supplier]);
-    SawNilaiHistoris::factory()->create(['supplier_id' => $supplierB->id_supplier]);
+    $supplierCheap = Supplier::factory()->create();
+    $supplierExpensive = Supplier::factory()->create();
 
-    foreach ([$supplierA, $supplierB] as $i => $supplier) {
-        $inquiry = SupplierInquiry::factory()->create([
-            'needlist_id' => $needlist->id, 'supplier_id' => $supplier->id_supplier, 'status' => 'responded',
-        ]);
-        SupplierInquiryItem::factory()->create([
-            'inquiry_id' => $inquiry->id, 'id_variasi' => $variasi->id_variasi,
-            'harga_penawaran' => 100000 + $i * 1000, 'estimasi_pengiriman' => now()->addDays(5)->toDateString(),
-        ]);
-    }
+    $sharedHistoris = ['C2' => 3, 'C3' => 5, 'C4' => 95, 'C5' => 95, 'C6' => 4];
+
+    $historisCheap = SawNilaiHistoris::factory()->create(['supplier_id' => $supplierCheap->id_supplier]);
+    seedHistorisNilai($historisCheap, $sharedHistoris);
+
+    $historisExpensive = SawNilaiHistoris::factory()->create(['supplier_id' => $supplierExpensive->id_supplier]);
+    seedHistorisNilai($historisExpensive, $sharedHistoris);
+
+    $inquiryCheap = SupplierInquiry::factory()->create([
+        'needlist_id' => $needlist->id, 'supplier_id' => $supplierCheap->id_supplier, 'status' => 'responded',
+    ]);
+    SupplierInquiryItem::factory()->create([
+        'inquiry_id' => $inquiryCheap->id, 'id_variasi' => $variasi->id_variasi,
+        'harga_penawaran' => 100000, 'estimasi_pengiriman' => now()->addDays(5)->toDateString(),
+    ]);
+
+    $inquiryExpensive = SupplierInquiry::factory()->create([
+        'needlist_id' => $needlist->id, 'supplier_id' => $supplierExpensive->id_supplier, 'status' => 'responded',
+    ]);
+    SupplierInquiryItem::factory()->create([
+        'inquiry_id' => $inquiryExpensive->id, 'id_variasi' => $variasi->id_variasi,
+        'harga_penawaran' => 120000, 'estimasi_pengiriman' => now()->addDays(3)->toDateString(),
+    ]);
 
     $needlist->load(['details', 'supplierInquiries.supplier', 'supplierInquiries.items.variasi.m_barang']);
 
     $results = (new SawBatchCalculator(app(SawService::class), app(\App\Services\NeedlistSelectionGrouper::class)))
         ->calculateForNeedlist($needlist);
 
-    // Current (buggy) behavior: no group at all is produced for this universal item,
-    // even though there are clearly 2 competing suppliers offering the exact same SKU.
-    expect($results)->toHaveCount(0);
+    // Fixed behavior: both suppliers land in the same group and get compared via SAW.
+    expect($results)->toHaveCount(1);
+    expect($results[0]['auto_assigned'])->toBeFalse();
+    expect($results[0]['recommended']['supplier_id'])->toBe($supplierCheap->id_supplier);
 });

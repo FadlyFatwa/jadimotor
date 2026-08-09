@@ -92,11 +92,18 @@
                     <div class="col-md-4">
                         <div class="form-group">
                             <label>Bobot <span class="text-danger">*</span></label>
+                            @php
+                                $bobotAwal = old('bobot', $kriteria->bobot ?? '');
+                                $bobotAwal = $bobotAwal === '' || $bobotAwal === null
+                                    ? ''
+                                    : rtrim(rtrim(number_format((float) $bobotAwal, 2, '.', ''), '0'), '.');
+                            @endphp
                             <div class="input-group">
-                                <input type="number" step="0.05" min="0" max="1" name="bobot"
-                                       value="{{ old('bobot', $kriteria->bobot ?? '') }}"
+                                <input type="number" step="0.01" min="0" max="1" name="bobot"
+                                       value="{{ $bobotAwal }}"
                                        class="form-control @error('bobot') is-invalid @enderror"
-                                       placeholder="contoh: 0.20" required>
+                                       placeholder="contoh: 0.20" required
+                                       onblur="if(this.value!=='') this.value = (Math.round(parseFloat(this.value)*100)/100)">
                                 <div class="input-group-append">
                                     <span class="input-group-text">(0 – 1)</span>
                                 </div>

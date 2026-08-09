@@ -110,7 +110,13 @@ class NeedlistSelectionGrouper
     }
 
     /**
-     * Connected-components: gabungkan item yang berbagi generasi kendaraan yang sama.
+     * Connected-components: gabungkan item yang berbagi generasi kendaraan yang sama,
+     * ATAU yang merupakan id_variasi persis sama (SKU identik dari supplier berbeda
+     * harus selalu satu kelompok, apa pun status data kompatibilitas kendaraannya —
+     * kalau variasi belum dikategorikan/tidak punya vehicleGenerations sama sekali,
+     * tanpa guard ini setiap baris jadi cluster sendiri-sendiri walau id_variasi-nya
+     * sama, jadi "1 variasi, 2 supplier" salah kehitung 2 kelompok ber-alternatif 1,
+     * bukan 1 kelompok ber-alternatif 2 — lihat diskusi kesesuaian dgn AD-03 Bab 3).
      */
     private function clusterByVehicleGeneration(array $items): array
     {
@@ -132,7 +138,9 @@ class NeedlistSelectionGrouper
 
         for ($i = 0; $i < $n; $i++) {
             for ($j = $i + 1; $j < $n; $j++) {
-                if (!empty(array_intersect($genSets[$i], $genSets[$j]))) {
+                $sameVariasi = $items[$i]['item']->id_variasi === $items[$j]['item']->id_variasi;
+
+                if ($sameVariasi || !empty(array_intersect($genSets[$i], $genSets[$j]))) {
                     $ri = $find($i);
                     $rj = $find($j);
                     if ($ri !== $rj) {

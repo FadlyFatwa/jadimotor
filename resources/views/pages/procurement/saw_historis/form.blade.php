@@ -163,12 +163,18 @@
                                         @endforeach
                                     </select>
                                 @else
+                                    @php
+                                        $oldValDisplay = $oldVal === '' || $oldVal === null
+                                            ? ''
+                                            : rtrim(rtrim(number_format((float) $oldVal, 1, '.', ''), '0'), '.');
+                                    @endphp
                                     <input type="text" inputmode="decimal"
                                            name="nilai_kriteria[{{ $k->id }}]"
-                                           value="{{ $oldVal }}"
+                                           value="{{ $oldValDisplay }}"
                                            class="form-control @error($fieldName) is-invalid @enderror"
                                            placeholder="contoh: 4"
-                                           oninput="this.value = this.value.replace(',', '.')">
+                                           oninput="this.value = this.value.replace(',', '.')"
+                                           onblur="if(this.value!=='') this.value = (Math.round(parseFloat(this.value)*10)/10)">
                                 @endif
 
                                 <small class="form-text text-muted">{{ $hint }}</small>
